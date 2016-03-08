@@ -21,7 +21,7 @@ void* SimulatedAnnealingThread(void* args) {
   // unique_ptr<SASolution> best_solution(
   //    new SASolution(*initial));
   double best_cost = initial->cost;
-  const int kMaxIterations = 150;
+  const int kMaxIterations = 1000;
   const int kIterationsPerTemperature = 150;
   double temparature = 0.95;
   double ro = 0.99;
