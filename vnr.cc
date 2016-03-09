@@ -18,8 +18,6 @@ void* SimulatedAnnealingThread(void* args) {
   unique_ptr<SASolution> current_solution(
       new SASolution(*initial));
   SASolution* best_solution = new SASolution(*initial);
-  // unique_ptr<SASolution> best_solution(
-  //    new SASolution(*initial));
   double best_cost = initial->cost;
   const int kMaxIterations = 1000;
   const int kIterationsPerTemperature = 150;
@@ -44,7 +42,7 @@ void* SimulatedAnnealingThread(void* args) {
       if (cost_difference < 0.0) {
         current_solution.reset(next.release());
         DEBUG("Better taken\n");
-      } else if (rand_val > energy_value) {
+      } else if (rand_val < energy_value) {
         current_solution.reset(next.release());
         DEBUG("Worse taken\n");
       } 
