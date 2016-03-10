@@ -7,6 +7,7 @@
 #include <boost/random/variate_generator.hpp>
 
 #include <pthread.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -14,14 +15,15 @@ const std::string kUsage =
     "./vne_reallocation "
     "--case_directory=<case_directory>";
 
+int max_iterations = 300;
+int iterations_per_temperature = 150;
+
 void* SimulatedAnnealingThread(void* args) {
   SASolution* initial = reinterpret_cast<SASolution*>(args);
   unique_ptr<SASolution> current_solution(
       new SASolution(*initial));
   SASolution* best_solution = new SASolution(*initial);
   double best_cost = initial->cost;
-  const int kMaxIterations = 300;
-  const int kIterationsPerTemperature = 150;
   double temparature = 0.95;
   double ro = 0.99;
   int k = 0;
@@ -53,9 +55,9 @@ void* SimulatedAnnealingThread(void* args) {
         best_solution = new SASolution(*current_solution);
         DEBUG("Best updated, current best cost = %lf\n", best_cost);
       }
-    } while(++l < kIterationsPerTemperature);
+    } while(++l < iterations_per_temperature);
     temparature *= ro;
-  } while(++k < kMaxIterations);
+  } while(++k < max_iterations);
   pthread_exit(reinterpret_cast<void*>(best_solution));
 }
 
@@ -70,6 +72,10 @@ int main(int argc, char* argv[]) {
        ++arg_map_it) {
     if (arg_map_it->first == "--case_directory") {
       case_directory = arg_map_it->second;
+    } else if (arg_map_it->first == "--max_iterations") {
+      max_iterations = atoi(arg_map_it->second.c_str());
+    } else if (arg_map_it->first == "--iterations_per_temperature") {
+      iterations_per_temperature = atoi(arg_map_it->second.c_str());
     } else {
       printf("Invalid command line option: %s\n", arg_map_it->first.c_str());
       printf("Usage: %s\n", kUsage.c_str());
