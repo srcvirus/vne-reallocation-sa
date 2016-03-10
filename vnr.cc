@@ -7,6 +7,7 @@
 #include <boost/random/variate_generator.hpp>
 
 #include <pthread.h>
+#include <time.h>
 #include <unistd.h>
 
 const std::string kUsage =
@@ -19,7 +20,7 @@ void* SimulatedAnnealingThread(void* args) {
       new SASolution(*initial));
   SASolution* best_solution = new SASolution(*initial);
   double best_cost = initial->cost;
-  const int kMaxIterations = 1000;
+  const int kMaxIterations = 300;
   const int kIterationsPerTemperature = 150;
   double temparature = 0.95;
   double ro = 0.99;
@@ -138,7 +139,8 @@ int main(int argc, char* argv[]) {
   f = fopen((case_directory + "/vnr/prev_max_plink_util").c_str(), "w");
   fprintf(f, "%lf\n", prev_max_util);
   fclose(f);
-
+  
+  std::time_t start = std::time(NULL);
   ptr_vector<SASolution> initial_solutions;
   initial_solutions.push_back(
       new SASolution(physical_topology.get(), virt_topologies,
@@ -177,9 +179,12 @@ int main(int argc, char* argv[]) {
       best_solution = &solutions[i];
     }
   }
+  std::time_t end = std::time(NULL);
+  double duration = std::difftime(end, start);
   int new_bnecks = GetNumBottleneckLinks(physical_topology.get(), virt_topologies,
       best_solution->vn_embeddings, &vnr_parameters);
   printf("BN = %ld\n", best_solution->bottleneck_edges.size());
+  printf("Exec time = %lfs\n", duration);
   double new_cost = best_solution->cost;
   long new_bw_cost = static_cast<long>(
       (new_cost - vnr_parameters.beta * new_bnecks) / vnr_parameters.alpha);
@@ -188,6 +193,9 @@ int main(int argc, char* argv[]) {
 
   DEBUG("new_bnecks = %d, new_cost = %lf, new_bw_cost = %ld\n", 
       new_bnecks, new_cost, new_bw_cost);
+  f = fopen((case_directory + "/vnr/sol_time").c_str(), "w");
+  fprintf(f, "%lf\n", duration);
+  fclose(f);
   f = fopen((case_directory + "/vnr/new_cost").c_str(), "w");
   fprintf(f, "%lf\n", new_cost);
   fclose(f);
