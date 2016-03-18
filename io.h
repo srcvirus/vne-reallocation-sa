@@ -139,14 +139,14 @@ unique_ptr<VNEmbedding> InitializeVNEmbeddingFromFile(const char* nmap_file,
   return boost::move(vn_embedding);
 }
 
-VNRParameters InitializeParametersFromFile(const char *parameter_file) {
+VNRParameters InitializeParametersFromFile(const char* parameter_file) {
   VNRParameters parameters;
-  FILE *param_file = fopen(parameter_file, "r");
+  FILE* param_file = fopen(parameter_file, "r");
   if (!param_file) {
     return parameters;
   }
   char buffer[256];
-  const char *prefix[] = {"Goal Utilization", "alpha", "beta", "gamma"};
+  const char* prefix[] = {"Goal Utilization", "alpha", "beta", "gamma"};
   enum {
     UTIL = 0,
     ALPHA,

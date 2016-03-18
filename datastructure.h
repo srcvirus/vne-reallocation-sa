@@ -182,7 +182,7 @@ class Graph {
       if (end_point_it->node_id == v) return end_point_it->bandwidth;
     }
   }
-  
+
   void SetEdgeBandwidth(int u, int v, long bw) {
     if (is_matrixized_) adj_matrix_[u][v].bandwidth = bw;
     std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
@@ -419,17 +419,17 @@ struct SASolution {
         if (node_bw_heap_handlers.find(nb_key) == node_bw_heap_handlers.end()) {
           long total_cost = 0;
           std::vector<edge_endpoint>::const_iterator vend_point_it;
-          const std::vector<edge_endpoint>& neighbors = 
-            virt_topologies[i].adj_list()->at(vlink.first);
-          for (vend_point_it = neighbors.begin(); 
+          const std::vector<edge_endpoint>& neighbors =
+              virt_topologies[i].adj_list()->at(vlink.first);
+          for (vend_point_it = neighbors.begin();
                vend_point_it != neighbors.end(); ++vend_point_it) {
             long bw = vend_point_it->bandwidth;
             const path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
             path_t::const_iterator path_it;
-            for (path_it = mapped_path.begin(); path_it != mapped_path.end(); 
-                ++path_it) {
-              total_cost += bw * physical_topology->GetEdgeCost(path_it->first,
-                                  path_it->second);
+            for (path_it = mapped_path.begin(); path_it != mapped_path.end();
+                 ++path_it) {
+              total_cost += bw * physical_topology->GetEdgeCost(
+                                     path_it->first, path_it->second);
             }
           }
           node_bw_set_element_t nb_value(nb_key, total_cost);
@@ -440,17 +440,17 @@ struct SASolution {
         if (node_bw_heap_handlers.find(nb_key) == node_bw_heap_handlers.end()) {
           long total_cost = 0;
           std::vector<edge_endpoint>::const_iterator vend_point_it;
-          const std::vector<edge_endpoint>& neighbors = 
-            virt_topologies[i].adj_list()->at(vlink.second);
-          for (vend_point_it = neighbors.begin(); 
+          const std::vector<edge_endpoint>& neighbors =
+              virt_topologies[i].adj_list()->at(vlink.second);
+          for (vend_point_it = neighbors.begin();
                vend_point_it != neighbors.end(); ++vend_point_it) {
             long bw = vend_point_it->bandwidth;
             path_t::const_iterator path_it;
             const path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
-            for (path_it = mapped_path.begin(); path_it != mapped_path.end(); 
+            for (path_it = mapped_path.begin(); path_it != mapped_path.end();
                  ++path_it) {
               total_cost += bw * physical_topology->GetEdgeCost(
-                                  path_it->first, path_it->second);
+                                     path_it->first, path_it->second);
             }
           }
           node_bw_set_element_t nb_value(nb_key, total_cost);
@@ -467,8 +467,7 @@ struct SASolution {
           res_bw_matrix.matrix[u][v] -= b_mn;
           res_bw_matrix.matrix[v][u] -= b_mn;
 
-          if (res_bw_matrix.matrix[u][v] < 0) 
-            printf("!!!!BANG!!!!\n");
+          if (res_bw_matrix.matrix[u][v] < 0) printf("!!!!BANG!!!!\n");
         }
       }
     }
@@ -484,19 +483,20 @@ struct SASolution {
         long res_bw = res_bw_matrix.matrix[u][v];
         long b_uv = physical_topology->GetEdgeBandwidth(u, v);
         util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
-          1.0 - static_cast<double>(res_bw) / static_cast<double>(b_uv);
+            1.0 - static_cast<double>(res_bw) / static_cast<double>(b_uv);
         // Populate the set of bottleneck physical links.
         if (util_matrix.matrix[u][v] > vnr_params.util_threshold) {
           if (bneck_heap_handlers.find(ConstructEdge(u, v)) ==
               bneck_heap_handlers.end()) {
-            bneck_heap_handlers[ConstructEdge(u, v)] = bottleneck_edges.push(
-                bneck_edge_element_t(ConstructEdge(u, v), util_matrix.matrix[u][v]));
+            bneck_heap_handlers[ConstructEdge(u, v)] =
+                bottleneck_edges.push(bneck_edge_element_t(
+                    ConstructEdge(u, v), util_matrix.matrix[u][v]));
           }
         }
       }
     }
 
-    // For DEBUG only.
+// For DEBUG only.
 #ifdef DBG
 /*
     fibonacci_heap<bneck_edge_element_t>::ordered_iterator fit =
@@ -515,7 +515,8 @@ struct SASolution {
       vlinks_by_plength.ordered_begin();
     for ( ; it != vlinks_by_plength.ordered_end(); ++it) {
       printf("vn = %d, vlink = (%d, %d), plen = %d\n",
-          it->vn_edge.first, it->vn_edge.second.first, it->vn_edge.second.second, it->path_len);
+          it->vn_edge.first, it->vn_edge.second.first,
+   it->vn_edge.second.second, it->path_len);
     }
 */
 #endif

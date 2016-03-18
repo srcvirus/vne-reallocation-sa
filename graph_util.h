@@ -5,27 +5,33 @@
 
 // If delta is -ve then residual bandwidth is reduced. If delta is +ve then
 // residual bandwidth is increased.
-void UpdateResidualBandwidth(matrix_t<long>& res_bw_matrix, const path_t& path, long delta) {
+void UpdateResidualBandwidth(matrix_t<long>& res_bw_matrix, const path_t& path,
+                             long delta) {
   path_t::const_iterator path_it;
   for (path_it = path.begin(); path_it != path.end(); ++path_it) {
     int u = path_it->first, v = path_it->second;
-    //DEBUG("before: res_bw_matrix[%d][%d] = %ld\n", u, v, res_bw_matrix.matrix[u][v]);
+    // DEBUG("before: res_bw_matrix[%d][%d] = %ld\n", u, v,
+    // res_bw_matrix.matrix[u][v]);
     res_bw_matrix.matrix[u][v] += delta;
     res_bw_matrix.matrix[v][u] += delta;
-    //DEBUG("after: res_bw_matrix[%d][%d] = %ld\n", u, v, res_bw_matrix.matrix[u][v]);
+    // DEBUG("after: res_bw_matrix[%d][%d] = %ld\n", u, v,
+    // res_bw_matrix.matrix[u][v]);
   }
 }
 
-void UpdateUtilMatrix(const Graph* graph, matrix_t<double>& util_matrix, const matrix_t<long>& res_bw_matrix, const path_t& path) {
+void UpdateUtilMatrix(const Graph* graph, matrix_t<double>& util_matrix,
+                      const matrix_t<long>& res_bw_matrix, const path_t& path) {
   path_t::const_iterator path_it;
   for (path_it = path.begin(); path_it != path.end(); ++path_it) {
     int u = path_it->first, v = path_it->second;
     long b_uv = graph->GetEdgeBandwidth(u, v);
     long res_uv = res_bw_matrix.matrix[u][v];
-    //DEBUG("before: util_matrix[%d][%d] = %lf\n", u, v, util_matrix.matrix[u][v]);
-    util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =  
-      1.0 - static_cast<double>(res_uv) / static_cast<double>(b_uv);
-    //DEBUG("after: util_matrix[%d][%d] = %lf\n", u, v, util_matrix.matrix[u][v]);
+    // DEBUG("before: util_matrix[%d][%d] = %lf\n", u, v,
+    // util_matrix.matrix[u][v]);
+    util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
+        1.0 - static_cast<double>(res_uv) / static_cast<double>(b_uv);
+    // DEBUG("after: util_matrix[%d][%d] = %lf\n", u, v,
+    // util_matrix.matrix[u][v]);
   }
 }
 
@@ -73,14 +79,15 @@ unique_ptr<path_t> ConstrainedVLinkEmbed(const Graph* phys_topology,
       const edge_endpoint& end_point = phys_topology->adj_list()->at(u)[i];
       int v = end_point.node_id;
       long link_res_bw = res_bw_matrix.matrix[u][v];
-      if ((to_avoid.find(edge_t(u, v)) != to_avoid.end())
-          || (to_avoid.find(edge_t(v, u)) != to_avoid.end())) continue;
+      if ((to_avoid.find(edge_t(u, v)) != to_avoid.end()) ||
+          (to_avoid.find(edge_t(v, u)) != to_avoid.end()))
+        continue;
       if (link_res_bw < bw) continue;
       long cost =
           end_point.cost *
           (bw + (static_cast<long>(util_matrix.matrix[u][v] *
                                    static_cast<double>(end_point.bandwidth))));
-      // long cost = end_point.cost * bw;                      
+      // long cost = end_point.cost * bw;
       if (d[v] > d[u] + cost) {
         d[v] = d[u] + cost;
         pre[v] = u;

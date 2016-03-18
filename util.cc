@@ -158,11 +158,10 @@ long CostFunction(const Graph* phys_topology, int num_vns,
 }
 */
 
-long GetBandwidthCost(
-    const Graph* phys_topology,
-    const boost::ptr_vector<Graph>& virt_topologies,
+unsigned long GetBandwidthCost(
+    const Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
     const boost::ptr_vector<VNEmbedding>& vn_embeddings) {
-  long cost = 0;
+  unsigned long cost = 0;
   for (int i = 0; i < virt_topologies.size(); ++i) {
     const VNEmbedding& embedding = vn_embeddings[i];
     const Graph& virt_topology = virt_topologies[i];
@@ -182,14 +181,13 @@ long GetBandwidthCost(
   return cost;
 }
 
-int GetNumBottleneckLinks(
-    const Graph* phys_topology,
-    const boost::ptr_vector<Graph>& virt_topologies,
-    const boost::ptr_vector<VNEmbedding>& vn_embeddings,
-    const VNRParameters* vnr_param) {
+int GetNumBottleneckLinks(const Graph* phys_topology,
+                          const boost::ptr_vector<Graph>& virt_topologies,
+                          const boost::ptr_vector<VNEmbedding>& vn_embeddings,
+                          const VNRParameters* vnr_param) {
   int num_bottlenecks = 0;
-  matrix_t<double> util_matrix(
-      phys_topology->node_count(), phys_topology->node_count(), 0.0);
+  matrix_t<double> util_matrix(phys_topology->node_count(),
+                               phys_topology->node_count(), 0.0);
   for (int i = 0; i < virt_topologies.size(); ++i) {
     const Graph& virt_topology = virt_topologies[i];
     const VNEmbedding& embedding = vn_embeddings[i];
@@ -201,8 +199,7 @@ int GetNumBottleneckLinks(
       path_t::const_iterator path_it;
       for (path_it = plinks.begin(); path_it != plinks.end(); ++path_it) {
         const edge_t& e = *path_it;
-        long b_mn =
-            virt_topology.GetEdgeBandwidth(vlink.first, vlink.second);
+        long b_mn = virt_topology.GetEdgeBandwidth(vlink.first, vlink.second);
         util_matrix.matrix[e.first][e.second] += b_mn;
         util_matrix.matrix[e.second][e.first] += b_mn;
       }
@@ -210,14 +207,14 @@ int GetNumBottleneckLinks(
   }
   for (int u = 0; u < phys_topology->node_count(); ++u) {
     std::vector<edge_endpoint>::const_iterator end_point_it;
-    const std::vector<edge_endpoint>& u_neighbors = 
-      phys_topology->adj_list()->at(u);
+    const std::vector<edge_endpoint>& u_neighbors =
+        phys_topology->adj_list()->at(u);
     for (end_point_it = u_neighbors.begin(); end_point_it != u_neighbors.end();
          ++end_point_it) {
       const edge_endpoint& end_point = *end_point_it;
       int v = end_point.node_id;
       long b_uv = phys_topology->GetEdgeBandwidth(u, v);
-      
+
       util_matrix.matrix[u][v] /= static_cast<double>(b_uv);
       if (u < v && util_matrix.matrix[u][v] > vnr_param->util_threshold) {
         ++num_bottlenecks;
@@ -228,12 +225,11 @@ int GetNumBottleneckLinks(
 }
 
 double GetMaxPLinkUtilization(
-    const Graph* phys_topology,
-    const boost::ptr_vector<Graph>& virt_topologies,
+    const Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
     const boost::ptr_vector<VNEmbedding>& vn_embeddings) {
   double max_util = 0.0;
-  matrix_t<double> util_matrix(
-      phys_topology->node_count(), phys_topology->node_count(), 0.0);
+  matrix_t<double> util_matrix(phys_topology->node_count(),
+                               phys_topology->node_count(), 0.0);
   for (int i = 0; i < virt_topologies.size(); ++i) {
     const Graph& virt_topology = virt_topologies[i];
     const VNEmbedding& embedding = vn_embeddings[i];
@@ -245,8 +241,7 @@ double GetMaxPLinkUtilization(
       path_t::const_iterator path_it;
       for (path_it = plinks.begin(); path_it != plinks.end(); ++path_it) {
         const edge_t& e = *path_it;
-        long b_mn =
-            virt_topology.GetEdgeBandwidth(vlink.first, vlink.second);
+        long b_mn = virt_topology.GetEdgeBandwidth(vlink.first, vlink.second);
         util_matrix.matrix[e.first][e.second] += b_mn;
         util_matrix.matrix[e.second][e.first] += b_mn;
       }
@@ -254,8 +249,8 @@ double GetMaxPLinkUtilization(
   }
   for (int u = 0; u < phys_topology->node_count(); ++u) {
     std::vector<edge_endpoint>::const_iterator end_point_it;
-    const std::vector<edge_endpoint>& u_neighbors = 
-      phys_topology->adj_list()->at(u);
+    const std::vector<edge_endpoint>& u_neighbors =
+        phys_topology->adj_list()->at(u);
     for (end_point_it = u_neighbors.begin(); end_point_it != u_neighbors.end();
          ++end_point_it) {
       const edge_endpoint& end_point = *end_point_it;
@@ -271,10 +266,11 @@ double GetMaxPLinkUtilization(
 }
 
 double CostFunction(const Graph* phys_topology,
-               const boost::ptr_vector<Graph>& virt_topologies,
-               const boost::ptr_vector<VNEmbedding>& vn_embeddings,
-               const VNRParameters* vnr_param) {
-  long bw_cost = GetBandwidthCost(phys_topology, virt_topologies, vn_embeddings);
+                    const boost::ptr_vector<Graph>& virt_topologies,
+                    const boost::ptr_vector<VNEmbedding>& vn_embeddings,
+                    const VNRParameters* vnr_param) {
+  long bw_cost =
+      GetBandwidthCost(phys_topology, virt_topologies, vn_embeddings);
   int num_bottlenecks = GetNumBottleneckLinks(phys_topology, virt_topologies,
                                               vn_embeddings, vnr_param);
   double cost = vnr_param->alpha * static_cast<double>(bw_cost) +
@@ -283,8 +279,7 @@ double CostFunction(const Graph* phys_topology,
 }
 
 void ComputePhysicalNetworkCapacity(
-    Graph* phys_topology,
-    const boost::ptr_vector<Graph>& virt_topologies,
+    Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
     const boost::ptr_vector<VNEmbedding>& vn_embeddings) {
   for (int i = 0; i < virt_topologies.size(); ++i) {
     const Graph& vn = virt_topologies[i];
@@ -297,8 +292,7 @@ void ComputePhysicalNetworkCapacity(
       int m = vlink.first, n = vlink.second;
       long b_mn = vn.GetEdgeBandwidth(m, n);
       path_t::const_iterator plink_it;
-      for (plink_it = plinks.begin(); plink_it != plinks.end();
-           ++plink_it) {
+      for (plink_it = plinks.begin(); plink_it != plinks.end(); ++plink_it) {
         int u = plink_it->first, v = plink_it->second;
         long cur_bw = phys_topology->GetEdgeBandwidth(u, v);
         phys_topology->SetEdgeBandwidth(u, v, cur_bw + b_mn);
@@ -311,28 +305,30 @@ void ComputePhysicalNetworkCapacity(
 void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
                          const std::string& vnr_directory) {
   for (int vn_index = 0; vn_index < vn_embeddings.size(); ++vn_index) {
-    std::string emap_file = 
-      vnr_directory + 
-      "/vn" + boost::lexical_cast<std::string>(vn_index) + ".edge_remap.txt";
-    std::string nmap_file = 
-      vnr_directory +
-      "/vn" + boost::lexical_cast<std::string>(vn_index) + ".node_remap.txt";
-    FILE *nmap_f = fopen(nmap_file.c_str(), "w");
+    std::string emap_file = vnr_directory + "/vn" +
+                            boost::lexical_cast<std::string>(vn_index) +
+                            ".edge_remap.txt";
+    std::string nmap_file = vnr_directory + "/vn" +
+                            boost::lexical_cast<std::string>(vn_index) +
+                            ".node_remap.txt";
+    FILE* nmap_f = fopen(nmap_file.c_str(), "w");
     const VNEmbedding& vne = vn_embeddings[vn_index];
     for (int i = 0; i < vne.node_map.size(); ++i) {
-      fprintf(nmap_f, "VN %d: Virtual node %d --> physical node %d\n", 
-          vn_index, i, vne.node_map[i]);
+      fprintf(nmap_f, "VN %d: Virtual node %d --> physical node %d\n", vn_index,
+              i, vne.node_map[i]);
     }
     fclose(nmap_f);
 
-    FILE *emap_f = fopen(emap_file.c_str(), "w");
+    FILE* emap_f = fopen(emap_file.c_str(), "w");
     edge_map_t::const_iterator emap_it;
-    for (emap_it = vne.edge_map.begin(); emap_it != vne.edge_map.end(); ++emap_it) {
+    for (emap_it = vne.edge_map.begin(); emap_it != vne.edge_map.end();
+         ++emap_it) {
       const edge_t& vlink = emap_it->first;
       const path_t& plinks = emap_it->second;
       path_t::const_iterator pit;
       for (pit = plinks.begin(); pit != plinks.end(); ++pit) {
-        fprintf(emap_f, "VN %d: Virtual edge (%d, %d) --> physical edge (%d, %d)\n",
+        fprintf(emap_f,
+                "VN %d: Virtual edge (%d, %d) --> physical edge (%d, %d)\n",
                 vn_index, vlink.first, vlink.second, pit->first, pit->second);
       }
     }

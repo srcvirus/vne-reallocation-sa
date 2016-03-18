@@ -20,8 +20,7 @@ int iterations_per_temperature = 150;
 
 void* SimulatedAnnealingThread(void* args) {
   SASolution* initial = reinterpret_cast<SASolution*>(args);
-  unique_ptr<SASolution> current_solution(
-      new SASolution(*initial));
+  unique_ptr<SASolution> current_solution(new SASolution(*initial));
   SASolution* best_solution = new SASolution(*initial);
   double best_cost = initial->cost;
   double temparature = 0.95;
@@ -29,7 +28,8 @@ void* SimulatedAnnealingThread(void* args) {
   int k = 0;
   boost::random::mt19937 seed(0x5414ab);
   boost::uniform_real<> dist(0, 1);
-  boost::variate_generator<boost::mt19937&, boost::uniform_real<> > random(seed,dist);
+  boost::variate_generator<boost::mt19937&, boost::uniform_real<> > random(
+      seed, dist);
   do {
     DEBUG("Iteration = %d\n", k);
     DEBUG("Current solution cost = %lf\n", current_solution->cost);
@@ -40,24 +40,24 @@ void* SimulatedAnnealingThread(void* args) {
       double cost_difference = next->cost - current_solution->cost;
       double energy_value = exp(-cost_difference / temparature);
       double rand_val = random();
-      DEBUG("Cost difference = %lf, Energy value = %lf, rand_val = %lf\n", 
-          cost_difference, energy_value, rand_val);
+      DEBUG("Cost difference = %lf, Energy value = %lf, rand_val = %lf\n",
+            cost_difference, energy_value, rand_val);
       if (cost_difference < 0.0) {
         current_solution.reset(next.release());
         DEBUG("Better taken\n");
       } else if (rand_val < energy_value) {
         current_solution.reset(next.release());
         DEBUG("Worse taken\n");
-      } 
+      }
       if (best_cost > current_solution->cost) {
         best_cost = current_solution->cost;
         delete best_solution;
         best_solution = new SASolution(*current_solution);
         DEBUG("Best updated, current best cost = %lf\n", best_cost);
       }
-    } while(++l < iterations_per_temperature);
+    } while (++l < iterations_per_temperature);
     temparature *= ro;
-  } while(++k < max_iterations);
+  } while (++k < max_iterations);
   pthread_exit(reinterpret_cast<void*>(best_solution));
 }
 
@@ -93,10 +93,12 @@ int main(int argc, char* argv[]) {
   boost::ptr_vector<VNEmbedding> vn_embeddings;
 
   while (true) {
-    const string kVirtTopologyFile =
-        case_directory + "/vnr/vn" + boost::lexical_cast<string>(num_vns) + ".txt";
+    const string kVirtTopologyFile = case_directory + "/vnr/vn" +
+                                     boost::lexical_cast<string>(num_vns) +
+                                     ".txt";
     const string kVNLocationConstraintFile =
-        case_directory + "/vnr/vnloc" + boost::lexical_cast<string>(num_vns) + ".txt";
+        case_directory + "/vnr/vnloc" + boost::lexical_cast<string>(num_vns) +
+        ".txt";
     const string kVLinkEmbeddingFile = kVirtTopologyFile + ".semap";
     const string kVNodeEmbeddingFile = kVirtTopologyFile + ".nmap";
     unique_ptr<Graph> virt_topology(
@@ -108,30 +110,31 @@ int main(int argc, char* argv[]) {
     virt_topologies[num_vns].Matrixize();
     DEBUG(virt_topologies[num_vns].GetDebugString().c_str());
     location_constraints.push_back(InitializeVNLocationsFromFile(
-        kVNLocationConstraintFile.c_str(), virt_topologies[num_vns].node_count())
-                                       .release());
+        kVNLocationConstraintFile.c_str(),
+        virt_topologies[num_vns].node_count()).release());
     vn_embeddings.push_back(InitializeVNEmbeddingFromFile(
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
     ++num_vns;
   }
-  ComputePhysicalNetworkCapacity(
-      physical_topology.get(), virt_topologies, vn_embeddings);
+  ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
+                                 vn_embeddings);
   physical_topology->Matrixize();
 
   VNRParameters vnr_parameters = InitializeParametersFromFile(
       (case_directory + "/optimize_para.txt").c_str());
   unique_ptr<ReverseEmbedding> reverse_embedding(GetInverseEmbedding(
       physical_topology.get(), vn_embeddings, num_vns).release());
-  
+
   // log old valus first.
-  double prev_cost = CostFunction
-    (physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
+  double prev_cost = CostFunction(physical_topology.get(), virt_topologies,
+                                  vn_embeddings, &vnr_parameters);
   int prev_num_bottlenecks = GetNumBottleneckLinks(
       physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
   long prev_bw_cost = static_cast<long>(
-      (prev_cost - vnr_parameters.beta * prev_num_bottlenecks) / vnr_parameters.alpha);
-  double prev_max_util = 
-    GetMaxPLinkUtilization(physical_topology.get(), virt_topologies, vn_embeddings);
+      (prev_cost - vnr_parameters.beta * prev_num_bottlenecks) /
+      vnr_parameters.alpha);
+  double prev_max_util = GetMaxPLinkUtilization(physical_topology.get(),
+                                                virt_topologies, vn_embeddings);
 
   FILE* f = fopen((case_directory + "/vnr/prev_cost").c_str(), "w");
   fprintf(f, "%lf\n", prev_cost);
@@ -145,22 +148,19 @@ int main(int argc, char* argv[]) {
   f = fopen((case_directory + "/vnr/prev_max_plink_util").c_str(), "w");
   fprintf(f, "%lf\n", prev_max_util);
   fclose(f);
-  
+
   std::time_t start = std::time(NULL);
   ptr_vector<SASolution> initial_solutions;
-  initial_solutions.push_back(
-      new SASolution(physical_topology.get(), virt_topologies,
-                     location_constraints, vnr_parameters, vn_embeddings,
-                     reverse_embedding.get(), num_vns));
-  initial_solutions[0].cost = 
-    CostFunction(
-        physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
+  initial_solutions.push_back(new SASolution(
+      physical_topology.get(), virt_topologies, location_constraints,
+      vnr_parameters, vn_embeddings, reverse_embedding.get(), num_vns));
+  initial_solutions[0].cost = CostFunction(
+      physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
   const int kNumCores = sysconf(_SC_NPROCESSORS_ONLN);
   const int kNumThreads = kNumCores;
   std::vector<pthread_t> threads(kNumThreads);
-  for (int i = 0, thread_id = 0, current_core = 0;
-       i < kNumThreads; ++i, ++thread_id,
-         current_core = (current_core + 1) % kNumCores) {
+  for (int i = 0, thread_id = 0, current_core = 0; i < kNumThreads;
+       ++i, ++thread_id, current_core = (current_core + 1) % kNumCores) {
     if (i > 0) {
       initial_solutions.push_back(
           GenerateNeighbor(initial_solutions[i - 1]).release());
@@ -168,7 +168,8 @@ int main(int argc, char* argv[]) {
     cpu_set_t cpu_set;
     CPU_ZERO(&cpu_set);
     CPU_SET(current_core, &cpu_set);
-    pthread_create(&threads[thread_id], NULL, &SimulatedAnnealingThread, &initial_solutions[i]);
+    pthread_create(&threads[thread_id], NULL, &SimulatedAnnealingThread,
+                   &initial_solutions[i]);
     pthread_setaffinity_np(threads[thread_id], sizeof(cpu_set), &cpu_set);
   }
   ptr_vector<SASolution> solutions;
@@ -187,18 +188,19 @@ int main(int argc, char* argv[]) {
   }
   std::time_t end = std::time(NULL);
   double duration = std::difftime(end, start);
-  int new_bnecks = GetNumBottleneckLinks(physical_topology.get(), virt_topologies,
-      best_solution->vn_embeddings, &vnr_parameters);
-  printf("BN = %ld\n", best_solution->bottleneck_edges.size());
+  int new_bnecks =
+      GetNumBottleneckLinks(physical_topology.get(), virt_topologies,
+                            best_solution->vn_embeddings, &vnr_parameters);
+  printf("B.Necks = %ld\n", best_solution->bottleneck_edges.size());
   printf("Exec time = %lfs\n", duration);
   double new_cost = best_solution->cost;
   long new_bw_cost = static_cast<long>(
       (new_cost - vnr_parameters.beta * new_bnecks) / vnr_parameters.alpha);
-  double new_max_util =
-    GetMaxPLinkUtilization(physical_topology.get(), virt_topologies, vn_embeddings);
+  double new_max_util = GetMaxPLinkUtilization(physical_topology.get(),
+                                               virt_topologies, vn_embeddings);
 
-  DEBUG("new_bnecks = %d, new_cost = %lf, new_bw_cost = %ld\n", 
-      new_bnecks, new_cost, new_bw_cost);
+  DEBUG("new_bnecks = %d, new_cost = %lf, new_bw_cost = %ld\n", new_bnecks,
+        new_cost, new_bw_cost);
   f = fopen((case_directory + "/vnr/sol_time").c_str(), "w");
   fprintf(f, "%lf\n", duration);
   fclose(f);
