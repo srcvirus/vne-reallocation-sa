@@ -23,7 +23,7 @@ void* SimulatedAnnealingThread(void* args) {
   unique_ptr<SASolution> current_solution(new SASolution(*initial));
   SASolution* best_solution = new SASolution(*initial);
   double best_cost = initial->cost;
-  double temparature = 0.95;
+  double temparature = 0.99;
   double ro = 0.99;
   int k = 0;
   boost::random::mt19937 seed(0x5414ab);
