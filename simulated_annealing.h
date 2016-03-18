@@ -453,16 +453,15 @@ bool PerformNodeMigration(const SASolution* current_solution,
   return reallocation_feasible;
 }
 
-unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution) {
+unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution, boost::random::mt19937& generator) {
   unique_ptr<SASolution> neighbor_solution(new SASolution(current_solution));
   enum {
     ALTER_BNECK = 0,
     NODE_MIGRATE,
     LINK_MIGRATE
   };
-  static boost::random::mt19937 generator;
   int n_possible_operations = 3;
-  static boost::random::uniform_int_distribution<> dist(
+  boost::random::uniform_int_distribution<> dist(
       0, n_possible_operations - 1);
   int current_operation = dist(generator);
 

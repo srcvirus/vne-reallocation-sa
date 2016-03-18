@@ -36,7 +36,7 @@ void* SimulatedAnnealingThread(void* args) {
     int l = 0;
     do {
       unique_ptr<SASolution> next(
-          GenerateNeighbor(*current_solution).release());
+          GenerateNeighbor(*current_solution, seed).release());
       double cost_difference = next->cost - current_solution->cost;
       double energy_value = exp(-cost_difference / temparature);
       double rand_val = random();
@@ -159,11 +159,12 @@ int main(int argc, char* argv[]) {
   const int kNumCores = sysconf(_SC_NPROCESSORS_ONLN);
   const int kNumThreads = kNumCores;
   std::vector<pthread_t> threads(kNumThreads);
+  boost::random::mt19937 seed(0x5414ab);
   for (int i = 0, thread_id = 0, current_core = 0; i < kNumThreads;
        ++i, ++thread_id, current_core = (current_core + 1) % kNumCores) {
     if (i > 0) {
       initial_solutions.push_back(
-          GenerateNeighbor(initial_solutions[i - 1]).release());
+          GenerateNeighbor(initial_solutions[i - 1], seed).release());
     }
     cpu_set_t cpu_set;
     CPU_ZERO(&cpu_set);
