@@ -24,12 +24,17 @@ using boost::ptr_vector;
 using boost::heap::fibonacci_heap;
 
 typedef std::pair<int, int> edge_t;
+typedef std::pair<int, edge_t> dwdm_edge_t;
 typedef std::pair<int, int> vnode_t;
 typedef std::pair<int, edge_t> vn_edge_t;
 typedef std::vector<edge_t> path_t;
+typedef std::pair<int, path_t> dwdm_path_t;
 typedef std::set<edge_t> edge_set_t;
+typedef std::set<dwdm_edge_t> dwdm_edge_set_t;
 typedef std::set<vn_edge_t> vedge_set_t;
 typedef std::map<edge_t, path_t> edge_map_t;
+typedef std::map<edge_t, dwdm_path_t> dwdm_edge_map_t;
+typedef std::map<dwdm_edge_t, vedge_set_t> dwdm_redge_map_t;
 typedef std::map<edge_t, vedge_set_t> reverse_edge_map_t;
 
 inline edge_t ConstructEdge(int u, int v) {
@@ -37,9 +42,14 @@ inline edge_t ConstructEdge(int u, int v) {
   return edge_t(u, v);
 }
 
+inline dwdm_edge_t ConstructDWDMEdge(int u, int v, int w) {
+  if (u > v) std::swap(u, v);
+  return dwdm_edge_t(w, edge_t(u, v));
+}
+
 template <typename T>
 struct matrix_t {
-  std::vector<std::vector<T> > matrix;
+  std::vector<std::vector<T > > matrix;
   matrix_t() {}
   matrix_t(int rows, int columns, T fill_value = T())
       : matrix(rows, std::vector<T>(columns, fill_value)) {}
@@ -81,19 +91,18 @@ struct node_bw_set_element_t {
 };
 
 // An entry in an adjacent list. An entry contains the node_id of the endpoint.
-// The entry contains bandwidth, residual bandwidth, delay and cost of the
-// corresponding edge.
+// The entry contains #channels, delay and cost of the corresponding edge.
 struct edge_endpoint {
   int node_id;
-  long bandwidth;
+  long channels;
   int delay;
   int cost;
-  edge_endpoint() : node_id(NIL), bandwidth(0), delay(INF), cost(INF) {}
-  edge_endpoint(int node_id, long bw, int delay, int cost)
-      : node_id(node_id), bandwidth(bw), delay(delay), cost(cost) {}
+  edge_endpoint() : node_id(NIL), channels(0), delay(INF), cost(INF) {}
+  edge_endpoint(int node_id, long ch, int delay, int cost)
+      : node_id(node_id), channels(ch), delay(delay), cost(cost) {}
   std::string GetDebugString() const {
     return "ndoe_id = " + boost::lexical_cast<std::string>(node_id) +
-           ", bandwidth = " + boost::lexical_cast<std::string>(bandwidth) +
+           ", channels = " + boost::lexical_cast<std::string>(channels) +
            ", delay = " + boost::lexical_cast<std::string>(delay) +
            ", cost = " + boost::lexical_cast<std::string>(cost);
   }
@@ -104,13 +113,14 @@ class Graph {
   Graph() {
     adj_list_ = unique_ptr<std::vector<std::vector<edge_endpoint> > >(
         new std::vector<std::vector<edge_endpoint> >);
-    node_count_ = edge_count_ = 0;
+    node_count_ = edge_count_ = max_channels_ = 0;
     is_matrixized_ = false;
   }
 
   Graph(const Graph& g) {
     this->node_count_ = g.node_count_;
     this->edge_count_ = g.edge_count_;
+    this->max_channels_ = g.max_channels_;
     this->adj_list_ = unique_ptr<std::vector<std::vector<edge_endpoint> > >(
         new std::vector<std::vector<edge_endpoint> >(*g.adj_list_.get()));
     this->is_matrixized_ = g.is_matrixized_;
@@ -120,6 +130,7 @@ class Graph {
   // Accessor methods.
   int node_count() const { return node_count_; }
   int edge_count() const { return edge_count_; }
+  int max_channels() const { return max_channels_; }
   const std::vector<std::vector<edge_endpoint> >* adj_list() const {
     return static_cast<const std::vector<std::vector<edge_endpoint> >*>(
         adj_list_.get());
@@ -146,7 +157,7 @@ class Graph {
   // u and v are 0-based identifiers of an edge endpoint. An edge is
   // bi-directional, i.e., calling Graph::AddEdge with u = 1, v = 3 will add
   // both (1, 3) and (3, 1) in the graph.
-  void AddEdge(int u, int v, long bw, int delay, int cost) {
+  void AddEdge(int u, int v, long channels, int delay, int cost) {
     if (adj_list_->size() < u + 1) adj_list_->resize(u + 1);
     if (adj_list_->size() < v + 1) adj_list_->resize(v + 1);
     const std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
@@ -157,10 +168,12 @@ class Graph {
         return;
       }
     }
-    adj_list_->at(u).push_back(edge_endpoint(v, bw, delay, cost));
-    adj_list_->at(v).push_back(edge_endpoint(u, bw, delay, cost));
+    adj_list_->at(u).push_back(edge_endpoint(v, channels, delay, cost));
+    adj_list_->at(v).push_back(edge_endpoint(u, channels, delay, cost));
     ++edge_count_;
     node_count_ = adj_list_->size();
+    if (max_channels_ < channels) 
+      max_channels_ = channels;
   }
 
   int GetEdgeCost(int u, int v) const {
@@ -173,38 +186,38 @@ class Graph {
     }
   }
 
-  long GetEdgeBandwidth(int u, int v) const {
-    if (is_matrixized_) return adj_matrix_[u][v].bandwidth;
+  long GetEdgeNumChannels(int u, int v) const {
+    if (is_matrixized_) return adj_matrix_[u][v].channels;
     const std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
     std::vector<edge_endpoint>::const_iterator end_point_it;
     for (end_point_it = neighbors.begin(); end_point_it != neighbors.end();
          ++end_point_it) {
-      if (end_point_it->node_id == v) return end_point_it->bandwidth;
+      if (end_point_it->node_id == v) return end_point_it->channels;
     }
   }
 
-  void SetEdgeBandwidth(int u, int v, long bw) {
-    if (is_matrixized_) adj_matrix_[u][v].bandwidth = bw;
+  void SetEdgeNumChannels(int u, int v, long channels) {
+    if (is_matrixized_) adj_matrix_[u][v].channels= channels;
     std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
     std::vector<edge_endpoint>::iterator end_point_it;
     for (end_point_it = neighbors.begin(); end_point_it != neighbors.end();
          ++end_point_it) {
       if (end_point_it->node_id == v) {
-        end_point_it->bandwidth = bw;
+        end_point_it->channels= channels;
         break;
       }
     }
   }
 
-  long GetTotalNodeBandwidth(int u) const {
+  long GetTotalNodeChannels(int u) const {
     const std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
     std::vector<edge_endpoint>::const_iterator end_point_it;
-    long total_bw = 0;
+    long total_ch = 0;
     for (end_point_it = neighbors.begin(); end_point_it != neighbors.end();
          ++end_point_it) {
-      total_bw += end_point_it->bandwidth;
+      total_ch += end_point_it->channels;
     }
-    return total_bw;
+    return total_ch;
   }
 
   int GetNodeDegree(int u) const { return adj_list_->at(u).size(); }
@@ -232,19 +245,17 @@ class Graph {
   unique_ptr<std::vector<std::vector<edge_endpoint> > > adj_list_;
   std::vector<std::vector<edge_endpoint> > adj_matrix_;
   int node_count_, edge_count_;
+  int max_channels_;
   bool is_matrixized_;
 };
 
 struct VNEmbedding {
   std::vector<int> node_map;
-  edge_map_t edge_map;
+  dwdm_edge_map_t edge_map;
   VNEmbedding() {}
-  VNEmbedding(const std::vector<int>& nmap, const edge_map_t& emap)
+  VNEmbedding(const std::vector<int>& nmap, const dwdm_edge_map_t& emap)
       : node_map(nmap), edge_map(emap) {}
   virtual ~VNEmbedding() {}
-  // unique_ptr<std::vector<int> > node_map;
-  // unique_ptr<edge_map_t> edge_map;
-  // long cost;
 };
 
 struct ReverseEmbedding {
@@ -255,13 +266,11 @@ struct ReverseEmbedding {
                    const reverse_edge_map_t& remap)
       : rnode_map(rnmap), redge_map(remap) {}
   virtual ~ReverseEmbedding() {}
-  //  unique_ptr<std::vector<std::set<vnode_t> > > rnode_map;
-  //  unique_ptr<reverse_edge_map_t> redge_map;
 };
 
 struct VNRParameters {
   // Weights of the cost components.
-  double alpha, beta, gamma;
+  double alpha, beta;
   // Threshold to determine bottlenec links.
   double util_threshold;
 };
@@ -276,7 +285,8 @@ struct SASolution {
   ptr_vector<VNEmbedding> vn_embeddings;
   unique_ptr<ReverseEmbedding> r_embedding;
   matrix_t<double> util_matrix;
-  matrix_t<long> res_bw_matrix;
+  matrix_t<std::vector<int> > res_channel_matrix;
+  // matrix_t<long> res_bw_matrix;
   fibonacci_heap<bneck_edge_element_t> bottleneck_edges;
   fibonacci_heap<edge_plength_set_element_t> vlinks_by_plength;
   fibonacci_heap<node_bw_set_element_t> node_bw_usage;
@@ -286,9 +296,11 @@ struct SASolution {
       vlp_heap_handlers;
   std::map<vnode_t, fibonacci_heap<node_bw_set_element_t>::handle_type>
       node_bw_heap_handlers;
+
   SASolution& operator=(const SASolution& sa_sol) {
     util_matrix = sa_sol.util_matrix;
-    res_bw_matrix = sa_sol.res_bw_matrix;
+    res_channel_matrix = sa_sol.res_channel_matrix;
+    // res_bw_matrix = sa_sol.res_bw_matrix;
     r_embedding = unique_ptr<ReverseEmbedding>(new ReverseEmbedding(
         sa_sol.r_embedding->rnode_map, sa_sol.r_embedding->redge_map));
     cost = sa_sol.cost;
@@ -334,7 +346,7 @@ struct SASolution {
         vnr_params(sa_sol.vnr_params),
         num_vns(sa_sol.num_vns),
         util_matrix(sa_sol.util_matrix),
-        res_bw_matrix(sa_sol.res_bw_matrix),
+        res_channel_matrix(sa_sol.res_channel_matrix),
         cost(sa_sol.cost) {
     // Populate reverse embedding.
     r_embedding = unique_ptr<ReverseEmbedding>(new ReverseEmbedding(
@@ -383,37 +395,40 @@ struct SASolution {
         vnr_params(params),
         num_vns(nvns),
         util_matrix(pt->node_count(), pt->node_count(), 0.0),
-        res_bw_matrix(pt->node_count(), pt->node_count(), 0) {
+        res_channel_matrix(pt->node_count(), pt->node_count()) {
     r_embedding = unique_ptr<ReverseEmbedding>(
         new ReverseEmbedding(re->rnode_map, re->redge_map));
 
-    // Initialize residual bandwidth matrix.
+    // Initialize residual channel matrix.
     for (int u = 0; u < physical_topology->node_count(); ++u) {
       std::vector<edge_endpoint>::const_iterator end_point_it;
       const std::vector<edge_endpoint>& u_neighbors =
           physical_topology->adj_list()->at(u);
       for (end_point_it = u_neighbors.begin();
            end_point_it != u_neighbors.end(); ++end_point_it) {
-        res_bw_matrix.matrix[u][end_point_it->node_id] =
-            end_point_it->bandwidth;
+        int v = end_point_it->node_id;
+        for (int w = 0; w < end_point_it->channels; ++w) {
+          res_channel_matrix.matrix[u][v].push_back(w);
+        }
       }
     }
 
-    // Populate utilization and residual bandwidth matrix.
+    // Populate utilization and residual channel matrix.
     for (int i = 0; i < num_vns; ++i) {
       vn_embeddings.push_back(
           new VNEmbedding(vnes[i].node_map, vnes[i].edge_map));
-      edge_map_t::const_iterator emap_it;
+      dwdm_edge_map_t::const_iterator emap_it;
       for (emap_it = vn_embeddings[i].edge_map.begin();
            emap_it != vn_embeddings[i].edge_map.end(); ++emap_it) {
         const edge_t& vlink = emap_it->first;
-        const path_t& plinks = emap_it->second;
+        int ch_id = emap_it->second.first;
+        const path_t& plinks = emap_it->second.second;
 
         // Populate the set of vlinks sorted by mapped physical path length.
         vlp_heap_handlers[vn_edge_t(i, vlink)] = vlinks_by_plength.push(
             edge_plength_set_element_t(vn_edge_t(i, vlink), plinks.size()));
 
-        // Populate the list of vnodes sorted according to total bandwidth
+        // Populate the list of vnodes sorted according to total channel 
         // consumption.
         vnode_t nb_key(i, vlink.first);
         if (node_bw_heap_handlers.find(nb_key) == node_bw_heap_handlers.end()) {
@@ -423,12 +438,13 @@ struct SASolution {
               virt_topologies[i].adj_list()->at(vlink.first);
           for (vend_point_it = neighbors.begin();
                vend_point_it != neighbors.end(); ++vend_point_it) {
-            long bw = vend_point_it->bandwidth;
-            const path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
+            long ch = vend_point_it->channels;
+            const dwdm_path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
             path_t::const_iterator path_it;
-            for (path_it = mapped_path.begin(); path_it != mapped_path.end();
+            for (path_it = mapped_path.second.begin(); 
+                 path_it != mapped_path.second.end();
                  ++path_it) {
-              total_cost += bw * physical_topology->GetEdgeCost(
+              total_cost += ch * physical_topology->GetEdgeCost(
                                      path_it->first, path_it->second);
             }
           }
@@ -444,12 +460,12 @@ struct SASolution {
               virt_topologies[i].adj_list()->at(vlink.second);
           for (vend_point_it = neighbors.begin();
                vend_point_it != neighbors.end(); ++vend_point_it) {
-            long bw = vend_point_it->bandwidth;
+            long ch = vend_point_it->channels;
             path_t::const_iterator path_it;
-            const path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
-            for (path_it = mapped_path.begin(); path_it != mapped_path.end();
-                 ++path_it) {
-              total_cost += bw * physical_topology->GetEdgeCost(
+            const dwdm_path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
+            for (path_it = mapped_path.second.begin(); 
+                 path_it != mapped_path.second.end(); ++path_it) {
+              total_cost += ch * physical_topology->GetEdgeCost(
                                      path_it->first, path_it->second);
             }
           }
@@ -460,14 +476,22 @@ struct SASolution {
         path_t::const_iterator plink_it;
         for (plink_it = plinks.begin(); plink_it != plinks.end(); ++plink_it) {
           int u = plink_it->first, v = plink_it->second;
-          long b_mn =
-              virt_topologies[i].GetEdgeBandwidth(vlink.first, vlink.second);
+          // long ch_mn =
+          //    virt_topologies[i].GetEdgeNumChannels(vlink.first, vlink.second);
 
-          // Populate residual bandwidth matrix.
-          res_bw_matrix.matrix[u][v] -= b_mn;
-          res_bw_matrix.matrix[v][u] -= b_mn;
-
-          if (res_bw_matrix.matrix[u][v] < 0) printf("!!!!BANG!!!!\n");
+          // Populate residual channel matrix.
+          std::vector<int>::iterator it = std::find(res_channel_matrix.matrix[u][v].begin(),
+                                                    res_channel_matrix.matrix[u][v].end(),
+                                                    ch_id);
+          if (it == res_channel_matrix.matrix[u][v].end()) {
+            printf("!!!!BANG!!!!\n"); 
+          }
+          else res_channel_matrix.matrix[u][v].erase(it);
+          it = std::find(res_channel_matrix.matrix[v][u].begin(), 
+                         res_channel_matrix.matrix[v][u].end(),
+                         ch_id);
+          if (it == res_channel_matrix.matrix[v][u].end()) printf("!!!!BANG!!!!\n"); 
+          res_channel_matrix.matrix[v][u].erase(it);
         }
       }
     }
@@ -480,10 +504,10 @@ struct SASolution {
       for (end_point_it = u_neighbors.begin();
            end_point_it != u_neighbors.end(); ++end_point_it) {
         int v = end_point_it->node_id;
-        long res_bw = res_bw_matrix.matrix[u][v];
-        long b_uv = physical_topology->GetEdgeBandwidth(u, v);
+        long res_ch = res_channel_matrix.matrix[u][v].size();
+        long ch_uv = physical_topology->GetEdgeNumChannels(u, v);
         util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
-            1.0 - static_cast<double>(res_bw) / static_cast<double>(b_uv);
+            1.0 - static_cast<double>(res_ch) / static_cast<double>(ch_uv);
         // Populate the set of bottleneck physical links.
         if (util_matrix.matrix[u][v] > vnr_params.util_threshold) {
           if (bneck_heap_handlers.find(ConstructEdge(u, v)) ==

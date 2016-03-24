@@ -74,12 +74,15 @@ unique_ptr<Graph> InitializeTopologyFromFile(const char* filename) {
     int u = atoi(row[1].c_str());
     int v = atoi(row[2].c_str());
     int cost = atoi(row[4].c_str());
-    long bw = atol(row[5].c_str());
+    long ch = atol(row[5].c_str());
     int delay = atoi(row[6].c_str());
+    if (row.size() >= 8) {
+      ch = atol(row[7].c_str());
+    }
 
-    DEBUG("Line[%d]: u = %d, v = %d, cost = %d, bw = %ld, delay = %d\n", i, u,
-          v, cost, bw, delay);
-    graph->AddEdge(u, v, bw, delay, cost);
+    DEBUG("Line[%d]: u = %d, v = %d, cost = %d, ch = %ld, delay = %d\n", i, u,
+          v, cost, ch, delay);
+    graph->AddEdge(u, v, ch, delay, cost);
   }
   return boost::move(graph);
 }
@@ -124,15 +127,16 @@ unique_ptr<VNEmbedding> InitializeVNEmbeddingFromFile(const char* nmap_file,
   }
   fclose(nmap);
   while (fgets(buf, sizeof(buf), emap) != NULL) {
-    int u, v, m, n;
-    sscanf(buf, "%d %d %d %d", &u, &v, &m, &n);
+    int u, v, m, n, dummy, ch;
+    sscanf(buf, "%d %d %d %d %d %d", &u, &v, &m, &n, &dummy, &ch);
     if (u > v) std::swap(u, v);
     if (m > n) std::swap(m, n);
     edge_t vlink(m, n), plink(u, v);
     if (vn_embedding->edge_map.find(vlink) == vn_embedding->edge_map.end()) {
-      vn_embedding->edge_map[vlink] = path_t();
+      vn_embedding->edge_map[vlink] = dwdm_path_t();
     }
-    vn_embedding->edge_map[vlink].push_back(plink);
+    vn_embedding->edge_map[vlink].first = ch;
+    vn_embedding->edge_map[vlink].second.push_back(plink);
   }
   fclose(emap);
   DEBUG("Embedding read successfully\n");
@@ -150,8 +154,7 @@ VNRParameters InitializeParametersFromFile(const char* parameter_file) {
   enum {
     UTIL = 0,
     ALPHA,
-    BETA,
-    GAMMA
+    BETA
   };
 
   while (fgets(buffer, sizeof(buffer), param_file) != NULL) {
@@ -168,9 +171,6 @@ VNRParameters InitializeParametersFromFile(const char* parameter_file) {
             break;
           case BETA:
             sscanf(buffer + strlen(prefix[i]) + 2, "%lf", &parameters.beta);
-            break;
-          case GAMMA:
-            sscanf(buffer + strlen(prefix[i]) + 2, "%lf", &parameters.gamma);
             break;
           default:
             DEBUG("Invalid parameter specified in %s\n", parameter_file);

@@ -116,8 +116,8 @@ int main(int argc, char* argv[]) {
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
     ++num_vns;
   }
-  ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
-                                 vn_embeddings);
+  // ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
+  //                                vn_embeddings);
   physical_topology->Matrixize();
 
   VNRParameters vnr_parameters = InitializeParametersFromFile(
@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
   f = fopen((case_directory + "/vnr/prev_max_plink_util").c_str(), "w");
   fprintf(f, "%lf\n", prev_max_util);
   fclose(f);
-
+  DEBUG("Prev bnecks = %d, Prev cost = %lf\n", prev_num_bottlenecks, prev_cost);
   std::time_t start = std::time(NULL);
   ptr_vector<SASolution> initial_solutions;
   initial_solutions.push_back(new SASolution(

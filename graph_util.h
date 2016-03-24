@@ -5,31 +5,50 @@
 
 // If delta is -ve then residual bandwidth is reduced. If delta is +ve then
 // residual bandwidth is increased.
-void UpdateResidualBandwidth(matrix_t<long>& res_bw_matrix, const path_t& path,
-                             long delta) {
+void UpdateResidualChannel(matrix_t<std::vector<int> >& res_channel_matrix, 
+                           const dwdm_path_t& path, bool erase) {
   path_t::const_iterator path_it;
-  for (path_it = path.begin(); path_it != path.end(); ++path_it) {
+  int ch_id = path.first;
+  for (path_it = path.second.begin(); path_it != path.second.end(); ++path_it) {
     int u = path_it->first, v = path_it->second;
+    std::vector<int>::iterator it;
+    if (erase) {
+      it = std::find(res_channel_matrix.matrix[u][v].begin(),
+                     res_channel_matrix.matrix[u][v].end(), ch_id);
+      res_channel_matrix.matrix[u][v].erase(it);
+      it = std::find(res_channel_matrix.matrix[v][u].begin(),
+                     res_channel_matrix.matrix[v][u].end(), ch_id);
+      res_channel_matrix.matrix[v][u].erase(it);
+    } else {
+      res_channel_matrix.matrix[u][v].insert(
+          std::upper_bound(res_channel_matrix.matrix[u][v].begin(),
+                           res_channel_matrix.matrix[u][v].end(),
+                           ch_id), ch_id);
+      res_channel_matrix.matrix[v][u].insert(
+          std::upper_bound(res_channel_matrix.matrix[v][u].begin(),
+                           res_channel_matrix.matrix[v][u].end(),
+                           ch_id), ch_id);
+    }
     // DEBUG("before: res_bw_matrix[%d][%d] = %ld\n", u, v,
     // res_bw_matrix.matrix[u][v]);
-    res_bw_matrix.matrix[u][v] += delta;
-    res_bw_matrix.matrix[v][u] += delta;
+    // res_bw_matrix.matrix[u][v] += delta;
+    // res_bw_matrix.matrix[v][u] += delta;
     // DEBUG("after: res_bw_matrix[%d][%d] = %ld\n", u, v,
     // res_bw_matrix.matrix[u][v]);
   }
 }
 
 void UpdateUtilMatrix(const Graph* graph, matrix_t<double>& util_matrix,
-                      const matrix_t<long>& res_bw_matrix, const path_t& path) {
+                      const matrix_t<std::vector<int> >& res_channel_matrix, const path_t& path) {
   path_t::const_iterator path_it;
   for (path_it = path.begin(); path_it != path.end(); ++path_it) {
     int u = path_it->first, v = path_it->second;
-    long b_uv = graph->GetEdgeBandwidth(u, v);
-    long res_uv = res_bw_matrix.matrix[u][v];
+    long ch_uv = graph->GetEdgeNumChannels(u, v);
+    long res_ch = res_channel_matrix.matrix[u][v].size();
     // DEBUG("before: util_matrix[%d][%d] = %lf\n", u, v,
     // util_matrix.matrix[u][v]);
     util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
-        1.0 - static_cast<double>(res_uv) / static_cast<double>(b_uv);
+        1.0 - static_cast<double>(res_ch) / static_cast<double>(ch_uv);
     // DEBUG("after: util_matrix[%d][%d] = %lf\n", u, v,
     // util_matrix.matrix[u][v]);
   }
@@ -53,59 +72,69 @@ struct dijkstra_node {
   bool operator<(const dijkstra_node& dnode) const { return cost < dnode.cost; }
 };
 
-unique_ptr<path_t> ConstrainedVLinkEmbed(const Graph* phys_topology,
-                                         const matrix_t<double>& util_matrix,
-                                         const matrix_t<long>& res_bw_matrix,
-                                         int src, int dest, long bw,
-                                         const std::set<edge_t>& to_avoid) {
+unique_ptr<dwdm_path_t> ConstrainedDWDMVLinkEmbed(
+    const Graph* phys_topology,
+    const matrix_t<double>& util_matrix,
+    const matrix_t<std::vector<int> >& res_channel_matrix,
+    int src, int dest, int required_channels, int max_channels,
+    const std::set<edge_t>& to_avoid) {
+  int ch_lo = 0, ch_hi = max_channels - 1;
 
-  std::vector<long> d(phys_topology->node_count(), INF);
-  std::vector<int> pre(phys_topology->node_count(), NIL);
-  std::vector<bool> finished(phys_topology->node_count(), false);
-  std::priority_queue<dijkstra_node> pq;
-
-  d[src] = 0;
-  pq.push(dijkstra_node(src, 0.0));
-
-  while (!pq.empty()) {
-    dijkstra_node dnode = pq.top();
-    pq.pop();
-    int u = dnode.node_id;
-    if (finished[u]) {
-      continue;
-    }
-    finished[u] = true;
-    for (int i = 0; i < phys_topology->adj_list()->at(u).size(); ++i) {
-      const edge_endpoint& end_point = phys_topology->adj_list()->at(u)[i];
-      int v = end_point.node_id;
-      long link_res_bw = res_bw_matrix.matrix[u][v];
-      if ((to_avoid.find(edge_t(u, v)) != to_avoid.end()) ||
-          (to_avoid.find(edge_t(v, u)) != to_avoid.end()))
+  unique_ptr<dwdm_path_t> ret_path(new dwdm_path_t(NIL, path_t()));
+  for (int ch = ch_lo; ch <= ch_hi; ++ch) {
+    std::vector<long> d(phys_topology->node_count(), INF);
+    std::vector<int> pre(phys_topology->node_count(), NIL);
+    std::vector<bool> finished(phys_topology->node_count(), false);
+    std::priority_queue<dijkstra_node> pq;
+    d[src] = 0;
+    pq.push(dijkstra_node(src, 0.0));
+    while (!pq.empty()) {
+      dijkstra_node dnode = pq.top();
+      pq.pop();
+      int u = dnode.node_id;
+      if (finished[u]) {
         continue;
-      if (link_res_bw < bw) continue;
-      long cost =
-          end_point.cost *
-          (bw + (static_cast<long>(util_matrix.matrix[u][v] *
-                                   static_cast<double>(end_point.bandwidth))));
-      // long cost = end_point.cost * bw;
-      if (d[v] > d[u] + cost) {
-        d[v] = d[u] + cost;
-        pre[v] = u;
-        pq.push(dijkstra_node(v, d[v]));
+      }
+      finished[u] = true;
+      for (int i = 0; i < phys_topology->adj_list()->at(u).size(); ++i) {
+        const edge_endpoint& end_point = phys_topology->adj_list()->at(u)[i];
+        int v = end_point.node_id;
+        bool has_valid_channel = 
+          (std::find(res_channel_matrix.matrix[u][v].begin(), 
+                     res_channel_matrix.matrix[u][v].end(), ch) != 
+           res_channel_matrix.matrix[u][v].end());
+        if (!has_valid_channel) continue;
+        int link_res_channels = res_channel_matrix.matrix[u][v].size();
+        if ((to_avoid.find(edge_t(u, v)) != to_avoid.end()) ||
+            (to_avoid.find(edge_t(v, u)) != to_avoid.end()))
+          continue;
+        if (link_res_channels < required_channels) continue;
+        long cost = end_point.cost * 
+                      (required_channels + 
+                       (static_cast<long>(util_matrix.matrix[u][v] *
+                                   static_cast<double>(end_point.channels))));
+        if (d[v] > d[u] + cost) {
+          d[v] = d[u] + cost;
+          pre[v] = u;
+          pq.push(dijkstra_node(v, d[v]));
+        }
       }
     }
-  }
-  unique_ptr<path_t> ret_path(new path_t());
-  int current = dest;
-  while (pre[current] != NIL) {
-    edge_t new_edge(pre[current], current);
-    if (pre[current] > current) {
-      std::swap(new_edge.first, new_edge.second);
+    if (d[dest] != INF) {
+      ret_path->second.clear();
+      ret_path->first = ch;
+      int current = dest;
+      while (pre[current] != NIL) {
+        edge_t new_edge(pre[current], current);
+        if (pre[current] > current) {
+          std::swap(new_edge.first, new_edge.second);
+        } 
+        ret_path->second.push_back(new_edge);
+        current = pre[current];
+      }
+      std::reverse(ret_path->second.begin(), ret_path->second.end());
     }
-    ret_path->push_back(new_edge);
-    current = pre[current];
   }
-  std::reverse(ret_path->begin(), ret_path->end());
   return boost::move(ret_path);
 }
 

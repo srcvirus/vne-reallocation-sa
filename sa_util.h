@@ -26,10 +26,10 @@ inline long GetEmbeddedPathCost(const vn_edge_t& vlink,
   long total_cost = 0;
   int vn_index = vlink.first;
   const edge_t& vedge = vlink.second;
-  long bw = sa_sol->virt_topologies[vn_index]
-                .GetEdgeBandwidth(vedge.first, vedge.second);
+  long ch = sa_sol->virt_topologies[vn_index]
+                .GetEdgeNumChannels(vedge.first, vedge.second);
   for (int i = 0; i < embedded_path.size(); ++i) {
-    total_cost += bw * sa_sol->physical_topology->GetEdgeCost(
+    total_cost += ch * sa_sol->physical_topology->GetEdgeCost(
                            embedded_path[i].first, embedded_path[i].second);
   }
   return total_cost;

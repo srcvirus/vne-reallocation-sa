@@ -46,11 +46,10 @@ unique_ptr<ReverseEmbedding> GetInverseEmbedding(
     int num_vns);
 
 // Returns the cost of embedding virt_topology on phys_topology.
-long CostFunction(const Graph* phys_topology, int num_vns,
+double CostFunction(const Graph* phys_topology, 
                   const ptr_vector<Graph>& virt_topologies,
-                  const ptr_vector<VNEmbedding>& embeddings,
-                  const ReverseEmbedding* r_embedding,
-                  const VNRParameters& vnr_params);
+                  const ptr_vector<VNEmbedding>& vn_embeddings,
+                  const VNRParameters* vnr_params);
 
 // Returns the cost of allocating bandwidth for embedding all the vns in
 // virt_topology on phys_topology.
@@ -69,10 +68,10 @@ double GetMaxPLinkUtilization(
     const boost::ptr_vector<VNEmbedding>& vn_embeddings);
 
 // Compute the cost of a set of embeddings using our cost function.
-double CostFunction(const Graph* phys_topology,
-                    const boost::ptr_vector<Graph>& virt_topologies,
-                    const boost::ptr_vector<VNEmbedding>& vn_embeddings,
-                    const VNRParameters* vnr_param);
+// double CostFunction(const Graph* phys_topology,
+//                     const boost::ptr_vector<Graph>& virt_topologies,
+//                     const boost::ptr_vector<VNEmbedding>& vn_embeddings,
+//                     const VNRParameters* vnr_param);
 
 // If the input physical network contains residual bandwidth then compute the
 // bandwidth capacity of the physical links by adding the bandwidths of embedded
