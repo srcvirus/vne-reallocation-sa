@@ -484,14 +484,16 @@ struct SASolution {
                                                     res_channel_matrix.matrix[u][v].end(),
                                                     ch_id);
           if (it == res_channel_matrix.matrix[u][v].end()) {
-            printf("!!!!BANG!!!!\n"); 
+            printf("!!!!BANG!!!! Culprit: %d %d %d %d %d %d\n", i, u, v, vlink.first, vlink.second, ch_id);
           }
           else res_channel_matrix.matrix[u][v].erase(it);
           it = std::find(res_channel_matrix.matrix[v][u].begin(), 
                          res_channel_matrix.matrix[v][u].end(),
                          ch_id);
-          if (it == res_channel_matrix.matrix[v][u].end()) printf("!!!!BANG!!!!\n"); 
-          res_channel_matrix.matrix[v][u].erase(it);
+          if (it == res_channel_matrix.matrix[v][u].end()) {
+            // printf("!!!!BANG!!!! Culprit: %d %d %d %d\n", i, v, u, ch_id);
+          }
+          else res_channel_matrix.matrix[v][u].erase(it);
         }
       }
     }
