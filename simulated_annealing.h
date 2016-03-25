@@ -84,12 +84,12 @@ double GetCostDelta(SASolution* sa_sol_ptr,
 }
 
 bool ReallocateBottleneckPLink(const SASolution* prev_sol,
-                               SASolution* new_sol,
-                               boost::random::mt19937& generator) {
+                               SASolution* new_sol) {
   int total_bottlenecks = new_sol->bottleneck_edges.size();
   int nTopTenPercent = total_bottlenecks;
   // static_cast<int>(ceil(static_cast<double>(total_bottlenecks) / 10.0));
-  boost::random::uniform_int_distribution<> dist(0, nTopTenPercent - 1);
+  static boost::random::mt19937 generator;
+  boost::random::uniform_int_distribution<> dist(0, nTopTenPercent);
   int plink_rank = dist(generator);
   // DEBUG("Removing %d-th top bottlneck link out of %d\n", plink_rank,
   //      new_sol->bottleneck_edges.size());
@@ -328,11 +328,11 @@ bool PerformVLinkMigration(const SASolution* current_solution,
 }
 
 bool PerformNodeMigration(const SASolution* current_solution,
-                          SASolution* neighbor_solution,
-                          boost::random::mt19937& generator) {
+                          SASolution* neighbor_solution) {
   bool reallocation_feasible = false;
   int num_total_vnodes = neighbor_solution->node_bw_usage.size();
-  boost::random::uniform_int_distribution<> dist(0, num_total_vnodes - 1);
+  static boost::random::mt19937 generator;
+  boost::random::uniform_int_distribution<> dist(0, num_total_vnodes);
   int vnode_to_move = dist(generator);
   fibonacci_heap<node_bw_set_element_t>::ordered_iterator nbit =
       neighbor_solution->node_bw_usage.ordered_begin();
@@ -492,13 +492,12 @@ unique_ptr<SASolution> GenerateNeighbor(
       if (total_bottlenecks > 0) {
         DEBUG("Performing Bneck link configuration\n");
         result = ReallocateBottleneckPLink(&current_solution,
-                                           neighbor_solution.get(),
-                                           generator);
+                                           neighbor_solution.get());
         break;
       }
     case NODE_MIGRATE:
       DEBUG("Performing Node migration\n");
-      result = PerformNodeMigration(&current_solution, neighbor_solution.get(), generator);
+      result = PerformNodeMigration(&current_solution, neighbor_solution.get());
       break;
     case LINK_MIGRATE:
       DEBUG("Perform link migration\n");
