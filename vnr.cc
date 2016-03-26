@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
       ParseArgs(argc, argv).release());
   string case_directory = "";
   std::map<string, string>::iterator arg_map_it;
+  double alpha = NIL, beta = NIL;
   for (arg_map_it = arg_map.get()->begin(); arg_map_it != arg_map.get()->end();
        ++arg_map_it) {
     if (arg_map_it->first == "--case_directory") {
@@ -76,6 +77,10 @@ int main(int argc, char* argv[]) {
       max_iterations = atoi(arg_map_it->second.c_str());
     } else if (arg_map_it->first == "--iterations_per_temperature") {
       iterations_per_temperature = atoi(arg_map_it->second.c_str());
+    } else if (arg_map_it->first == "--alpha") {
+      alpha = atof(arg_map_it->second.c_str());
+    } else if (arg_map_it->first == "--beta") {
+      beta = atof(arg_map_it->second.c_str());
     } else {
       printf("Invalid command line option: %s\n", arg_map_it->first.c_str());
       printf("Usage: %s\n", kUsage.c_str());
@@ -122,6 +127,8 @@ int main(int argc, char* argv[]) {
 
   VNRParameters vnr_parameters = InitializeParametersFromFile(
       (case_directory + "/optimize_para.txt").c_str());
+  if (fabs(alpha - NIL) > EPS) vnr_parameters.alpha = alpha;
+  if (fabs(beta - NIL) > EPS) vnr_parameters.beta = beta;
   unique_ptr<ReverseEmbedding> reverse_embedding(GetInverseEmbedding(
       physical_topology.get(), vn_embeddings, num_vns).release());
 
