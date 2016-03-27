@@ -113,7 +113,7 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
     const vedge_set_t& mapped_vlinks =
         new_sol->r_embedding->redge_map[plink_it->bneck_edge];
     vedge_set_t::const_iterator vlink_it;
-    vn_edge_t selected_vlink(NIL, edge_t(NIL, NIL));
+    std::vector<vn_edge_t> selected_vlinks;
     int max_bottlenecks = 0;
     for (vlink_it = mapped_vlinks.begin(); vlink_it != mapped_vlinks.end();
          ++vlink_it) {
@@ -125,11 +125,27 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
       DEBUG("vn = %d, vlink (%d, %d), n_bottlenecks = %d\n", vlink_it->first,
             vlink_it->second.first, vlink_it->second.second, n_bottlenecks);
       if (n_bottlenecks > max_bottlenecks) {
+        selected_vlinks.clear();
         max_bottlenecks = n_bottlenecks;
-        selected_vlink = *vlink_it;
+        selected_vlinks.push_back(*vlink_it);
+      } else if (n_bottlenecks == max_bottlenecks) {
+        selected_vlinks.push_back(*vlink_it);
       }
     }
-
+    vn_edge_t selected_vlink(NIL, edge_t(NIL, NIL));
+    int max_mapped_path_len = 0;
+    if (!selected_vlinks.empty()) {
+      std::vector<vn_edge_t>::iterator vlink_it;
+      for (vlink_it = selected_vlinks.begin(); vlink_it != selected_vlinks.end();
+           ++vlink_it) {
+        int mapped_path_len = 
+          new_sol->vn_embeddings[vlink_it->first].edge_map[vlink_it->second].second.size();
+        if (mapped_path_len > max_mapped_path_len) {
+          max_mapped_path_len = mapped_path_len;
+          selected_vlink = *vlink_it;
+        }
+      }
+    }
     if (selected_vlink.first != NIL) {
       int vn_index = selected_vlink.first;
       const edge_t& vlink = selected_vlink.second;
