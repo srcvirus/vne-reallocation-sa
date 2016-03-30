@@ -1,10 +1,6 @@
-# LIBS = -lm -lpthread  -DIL_STD
-
-# FILES = vne_reallocation.cc cplex_solver.cc util.cc vne_solution_builder.cc
 FILES = util.cc vnr.cc
-# LIBS = -lboost
 LIBS = -lpthread
-INCLUDES = -I/usr/local/include 
+INCLUDE_PATHS =
 
 all:
 	g++ -O3  $(LIB_PATHS) $(INCLUDE_PATHS) $(FILES) $(LIBS) -o vne_reallocation
