@@ -8,7 +8,7 @@ tar xvf boost_1_60_0.tar.bz2
 ```
 Then add the boost library path (in this example: `/usr/local/lib/boost_1_60_0`) in the `Makefile` as follows:
 ```
-INCLUDE_PATHS = /usr/local/lib/boost_1_60_0
+INCLUDE_PATHS = -I/usr/local/lib/boost_1_60_0
 ```
 
 ## File Organization
