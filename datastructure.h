@@ -23,6 +23,7 @@ using boost::movelib::unique_ptr;
 using boost::ptr_vector;
 using boost::heap::fibonacci_heap;
 
+// Type definition for convenience.
 typedef std::pair<int, int> edge_t;
 typedef std::pair<int, int> vnode_t;
 typedef std::pair<int, edge_t> vn_edge_t;
@@ -99,6 +100,13 @@ struct edge_endpoint {
   }
 };
 
+// Graph data structure. Represents an undirected graph. Internally, the graph
+// is represented as an adjacency list. As a speed hack, a function
+// Graph::Matrixize() is provided. When invoked, this function converts the
+// internal adjacency list to a adjacency matrix and then can lookup/update link
+// bandwidth in constant time. Be advised to use Graph::Matrixize() only after
+// the structure of the graph is stable, i.e., no link/node addition/deletion is
+// required.
 class Graph {
  public:
   Graph() {
@@ -196,6 +204,7 @@ class Graph {
     }
   }
 
+  // Returns the cumulative bandwidth of all links originating at node u.
   long GetTotalNodeBandwidth(int u) const {
     const std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
     std::vector<edge_endpoint>::const_iterator end_point_it;
@@ -242,11 +251,12 @@ struct VNEmbedding {
   VNEmbedding(const std::vector<int>& nmap, const edge_map_t& emap)
       : node_map(nmap), edge_map(emap) {}
   virtual ~VNEmbedding() {}
-  // unique_ptr<std::vector<int> > node_map;
-  // unique_ptr<edge_map_t> edge_map;
-  // long cost;
 };
 
+// Contains reverse embedding, i.e., physical --> virtual embedding.
+// rnode_map contains a mapping from a physical node to the set of virtual nodes
+// mapped on that physical node. redge_map contains mapping from a physical link
+// to the set of virtual links mapped on a path containing that physical link.
 struct ReverseEmbedding {
   std::vector<std::set<vnode_t> > rnode_map;
   reverse_edge_map_t redge_map;
@@ -255,8 +265,6 @@ struct ReverseEmbedding {
                    const reverse_edge_map_t& remap)
       : rnode_map(rnmap), redge_map(remap) {}
   virtual ~ReverseEmbedding() {}
-  //  unique_ptr<std::vector<std::set<vnode_t> > > rnode_map;
-  //  unique_ptr<reverse_edge_map_t> redge_map;
 };
 
 struct VNRParameters {
@@ -267,25 +275,58 @@ struct VNRParameters {
 };
 
 struct SASolution {
+  // Immutable pointer to the topology.
   const Graph* physical_topology;
+
+  // Immutable pointer vector the set of virtual topologies.
   const ptr_vector<Graph>& virt_topologies;
+
+  // Immutable pointer vector to the set of location constraints for the virtual
+  // topologies.
   const ptr_vector<std::vector<std::vector<int> > >& location_constraints;
+
+  // Optimization parameters.
   const VNRParameters& vnr_params;
+
+  // Number of VNs.
   int num_vns;
+
+  // Cost of this solution.
   double cost;
+
+  // Embedding of each virtual network from virt_topologies.
   ptr_vector<VNEmbedding> vn_embeddings;
+
+  // Reverse embedding of the virtual networks, i.e., physical --> virtual
+  // mapping.
   unique_ptr<ReverseEmbedding> r_embedding;
+
+  // Physical network utilization matrix.
   matrix_t<double> util_matrix;
+
+  // Physical network residual bandwidth matrix.
   matrix_t<long> res_bw_matrix;
+
+  // A heap of bottleneck physical links.
   fibonacci_heap<bneck_edge_element_t> bottleneck_edges;
+
+  // A heap of virtual links sorted by their mapped physical path lengths.
   fibonacci_heap<edge_plength_set_element_t> vlinks_by_plength;
+
+  // A heap of virtual nodes sorted by the cumulative bandwidth consumption
+  // of their incident virtual links.
   fibonacci_heap<node_bw_set_element_t> node_bw_usage;
+
+  // Bookkeeping datastructure to keep track of the heap element from each of
+  // the aforementioned heaps.
   std::map<edge_t, fibonacci_heap<bneck_edge_element_t>::handle_type>
       bneck_heap_handlers;
   std::map<vn_edge_t, fibonacci_heap<edge_plength_set_element_t>::handle_type>
       vlp_heap_handlers;
   std::map<vnode_t, fibonacci_heap<node_bw_set_element_t>::handle_type>
       node_bw_heap_handlers;
+
+  // Overloaded assignment opereator.
   SASolution& operator=(const SASolution& sa_sol) {
     util_matrix = sa_sol.util_matrix;
     res_bw_matrix = sa_sol.res_bw_matrix;
@@ -298,16 +339,14 @@ struct SASolution {
           sa_sol.vn_embeddings[i].node_map, sa_sol.vn_embeddings[i].edge_map));
     }
     bottleneck_edges = sa_sol.bottleneck_edges;
-    // Handle the handlers here.
+    // Update the handlers.
     for (fibonacci_heap<bneck_edge_element_t>::iterator be_it =
              bottleneck_edges.begin();
          be_it != bottleneck_edges.end(); ++be_it) {
       bneck_heap_handlers[be_it->bneck_edge] =
           fibonacci_heap<bneck_edge_element_t>::s_handle_from_iterator(be_it);
     }
-
     vlinks_by_plength = sa_sol.vlinks_by_plength;
-    // Handle the handlers here.
     for (fibonacci_heap<edge_plength_set_element_t>::iterator ep_it =
              vlinks_by_plength.begin();
          ep_it != vlinks_by_plength.end(); ++ep_it) {
@@ -315,9 +354,7 @@ struct SASolution {
           fibonacci_heap<edge_plength_set_element_t>::s_handle_from_iterator(
               ep_it);
     }
-
     node_bw_usage = sa_sol.node_bw_usage;
-    // Handle the handlers here.
     for (fibonacci_heap<node_bw_set_element_t>::iterator nb_it =
              node_bw_usage.begin();
          nb_it != node_bw_usage.end(); ++nb_it) {
@@ -327,6 +364,7 @@ struct SASolution {
     return *this;
   }
 
+  // Overloaded copy constructor.
   SASolution(const SASolution& sa_sol)
       : physical_topology(sa_sol.physical_topology),
         virt_topologies(sa_sol.virt_topologies),
@@ -339,20 +377,19 @@ struct SASolution {
     // Populate reverse embedding.
     r_embedding = unique_ptr<ReverseEmbedding>(new ReverseEmbedding(
         sa_sol.r_embedding->rnode_map, sa_sol.r_embedding->redge_map));
-
     for (int i = 0; i < num_vns; ++i) {
       vn_embeddings.push_back(new VNEmbedding(
           sa_sol.vn_embeddings[i].node_map, sa_sol.vn_embeddings[i].edge_map));
     }
+
     bottleneck_edges = sa_sol.bottleneck_edges;
-    // Handle the handlers here.
+    // Copy the handlers.
     for (fibonacci_heap<bneck_edge_element_t>::iterator be_it =
              bottleneck_edges.begin();
          be_it != bottleneck_edges.end(); ++be_it) {
       bneck_heap_handlers[be_it->bneck_edge] =
           fibonacci_heap<bneck_edge_element_t>::s_handle_from_iterator(be_it);
     }
-
     vlinks_by_plength = sa_sol.vlinks_by_plength;
     // Handle the handlers here.
     for (fibonacci_heap<edge_plength_set_element_t>::iterator ep_it =
@@ -362,7 +399,6 @@ struct SASolution {
           fibonacci_heap<edge_plength_set_element_t>::s_handle_from_iterator(
               ep_it);
     }
-
     node_bw_usage = sa_sol.node_bw_usage;
     // Handle the handlers here.
     for (fibonacci_heap<node_bw_set_element_t>::iterator nb_it =
@@ -495,33 +531,7 @@ struct SASolution {
         }
       }
     }
-
-// For DEBUG only.
-#ifdef DBG
-/*
-    fibonacci_heap<bneck_edge_element_t>::ordered_iterator fit =
-      bottleneck_edges.ordered_begin();
-    for ( ; fit != bottleneck_edges.ordered_end(); ++fit) {
-      printf("Bneck edge: (%d, %d) with util %lf\n",
-          fit->bneck_edge.first, fit->bneck_edge.second, fit->util);
-    }
-    fibonacci_heap<node_bw_set_element_t>::ordered_iterator nbit =
-      node_bw_usage.ordered_begin();
-    for (; nbit != node_bw_usage.ordered_end(); ++nbit) {
-      printf("vn = %d, node = %d, bw_cost = %ld\n",
-          nbit->vnode.first, nbit->vnode.second, nbit->bw_usage);
-    }
-    fibonacci_heap<edge_plength_set_element_t>::ordered_iterator it =
-      vlinks_by_plength.ordered_begin();
-    for ( ; it != vlinks_by_plength.ordered_end(); ++it) {
-      printf("vn = %d, vlink = (%d, %d), plen = %d\n",
-          it->vn_edge.first, it->vn_edge.second.first,
-   it->vn_edge.second.second, it->path_len);
-    }
-*/
-#endif
-    // Bad design. need to manually set the cost value.
   }
 };
 
-#endif  // MIDDLEBOX_PLACEMENT_SRC_DATASTRUCTURE_H_
+#endif  // DATASTRUCTURE_H_

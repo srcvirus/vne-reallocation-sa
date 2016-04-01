@@ -13,11 +13,21 @@
 
 const std::string kUsage =
     "./vne_reallocation "
-    "--case_directory=<case_directory>";
+    "--case_directory=<case_directory>\n"
+    "\t[--max_iterations=<max_iterations>]\n"
+    "\t[--iterations_per_temperature=<iterations_per_temperature>]";
 
+// Maximum number of main simulated annealing iterations to perform. Can also be
+// set by command line option --max_iterations
 int max_iterations = 300;
+
+// Number of iterations to perform for a fixed temperature. Can also be set by
+// command line option --iterations_per_temperature
 int iterations_per_temperature = 150;
 
+// Execution thread for simulated annealing search. It takes as parameter a
+// pointer to an initial solution and returns the best solution after the search
+// is complete.
 void* SimulatedAnnealingThread(void* args) {
   SASolution* initial = reinterpret_cast<SASolution*>(args);
   unique_ptr<SASolution> current_solution(new SASolution(*initial));
@@ -92,6 +102,7 @@ int main(int argc, char* argv[]) {
   boost::ptr_vector<std::vector<std::vector<int> > > location_constraints;
   boost::ptr_vector<VNEmbedding> vn_embeddings;
 
+  // Read the VNs and their embeddings.
   while (true) {
     const string kVirtTopologyFile = case_directory + "/vnr/vn" +
                                      boost::lexical_cast<string>(num_vns) +
@@ -116,8 +127,12 @@ int main(int argc, char* argv[]) {
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
     ++num_vns;
   }
+
+  // Compute the physical network capacity from the VN embeddings and residual
+  // capacity.
   ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
                                  vn_embeddings);
+  // Convert the internal adjacency list to adjacency matrix for fast lookup.
   physical_topology->Matrixize();
 
   VNRParameters vnr_parameters = InitializeParametersFromFile(
@@ -148,8 +163,11 @@ int main(int argc, char* argv[]) {
   f = fopen((case_directory + "/vnr/prev_max_plink_util").c_str(), "w");
   fprintf(f, "%lf\n", prev_max_util);
   fclose(f);
-
+  
+  // Start a timer.
   std::time_t start = std::time(NULL);
+
+  // Generate the initial solutions and start the solution threads.
   ptr_vector<SASolution> initial_solutions;
   initial_solutions.push_back(new SASolution(
       physical_topology.get(), virt_topologies, location_constraints,
@@ -173,6 +191,8 @@ int main(int argc, char* argv[]) {
                    &initial_solutions[i]);
     pthread_setaffinity_np(threads[thread_id], sizeof(cpu_set), &cpu_set);
   }
+
+  // Wait for the threads to finish and collect each solution.
   ptr_vector<SASolution> solutions;
   for (int i = 0; i < kNumThreads; ++i) {
     void* ret_value;
@@ -187,8 +207,12 @@ int main(int argc, char* argv[]) {
       best_solution = &solutions[i];
     }
   }
+
+  // Stop the timer.
   std::time_t end = std::time(NULL);
   double duration = std::difftime(end, start);
+
+  // Log the new values.
   int new_bnecks =
       GetNumBottleneckLinks(physical_topology.get(), virt_topologies,
                             best_solution->vn_embeddings, &vnr_parameters);

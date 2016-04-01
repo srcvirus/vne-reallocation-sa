@@ -80,8 +80,6 @@ unique_ptr<ReverseEmbedding> GetInverseEmbedding(
   for (int i = 0; i < num_vns; ++i) {
     // Generate physical_node --> set_of_vnodes mapping.
     for (int vnode = 0; vnode < embeddings[i].node_map.size(); ++vnode) {
-      // DEBUG("i = %d, vnode = %d, embeddings[i].node_map[vnode] = %d\n", i,
-      //      vnode, embeddings[i].node_map[vnode]);
       r_embedding->rnode_map[embeddings[i].node_map[vnode]]
           .insert(vnode_t(i, vnode));
     }
@@ -105,58 +103,6 @@ unique_ptr<ReverseEmbedding> GetInverseEmbedding(
   }
   return boost::move(r_embedding);
 }
-
-/*
-long CostFunction(const Graph* phys_topology, int num_vns,
-                  const ptr_vector<Graph>& virt_topologies,
-                  const ptr_vector<VNEmbedding>& embeddings,
-                  const ReverseEmbedding* r_embedding,
-                  const VNRParameters& vnr_params) {
-  double bw_cost = 0.0;
-  double bl_cost = 0.0;
-
-  // Bandwidth consumption cost.
-  for (int i = 0; i < num_vns; ++i) {
-    edge_map_t::const_iterator emap_it;
-    for (emap_it = embeddings[i].edge_map.begin();
-         emap_it != embeddings[i].edge_map.end(); ++emap_it) {
-      const edge_t& vlink = emap_it->first;
-      const path_t& plinks = emap_it->second;
-      path_t::const_iterator plink_it;
-      for (plink_it = plinks.begin(); plink_it != plinks.end(); ++plink_it) {
-        bw_cost += static_cast<double>(
-            phys_topology->GetEdgeCost(plink_it->first, plink_it->second) *
-            virt_topologies[i].GetEdgeBandwidth(vlink.first, vlink.second));
-      }
-    }
-  }
-  bw_cost *= vnr_params.alpha;
-
-  // Bottleneck Link cost.
-  reverse_edge_map_t::const_iterator remap_it;
-  int n_bottlenecks = 0;
-  for (remap_it = r_embedding->redge_map.begin();
-       remap_it != r_embedding->redge_map.end(); ++remap_it) {
-    vedge_set_t::const_iterator vlink_it;
-    const edge_t& plink = remap_it->first;
-    double util = 0.0;
-    for (vlink_it = remap_it->second.begin();
-         vlink_it != remap_it->second.end(); ++vlink_it) {
-      int vn_id = vlink_it->first;
-      const edge_t& vlink = vlink_it->second;
-      util += static_cast<double>(
-          virt_topologies[vn_id].GetEdgeBandwidth(vlink.first, vlink.second));
-    }
-    util /= static_cast<double>(
-        phys_topology->GetEdgeBandwidth(plink.first, plink.second));
-    if (util >= vnr_params.util_threshold) ++n_bottlenecks;
-  }
-  bl_cost = vnr_params.beta * static_cast<double>(n_bottlenecks);
-
-  double cost = bw_cost + bl_cost;
-  return cost;
-}
-*/
 
 unsigned long GetBandwidthCost(
     const Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
@@ -188,6 +134,7 @@ int GetNumBottleneckLinks(const Graph* phys_topology,
   int num_bottlenecks = 0;
   matrix_t<double> util_matrix(phys_topology->node_count(),
                                phys_topology->node_count(), 0.0);
+  // Compute physical link bandwidth usage.
   for (int i = 0; i < virt_topologies.size(); ++i) {
     const Graph& virt_topology = virt_topologies[i];
     const VNEmbedding& embedding = vn_embeddings[i];
@@ -205,6 +152,8 @@ int GetNumBottleneckLinks(const Graph* phys_topology,
       }
     }
   }
+
+  // Compute utilization from bandwidth usage.
   for (int u = 0; u < phys_topology->node_count(); ++u) {
     std::vector<edge_endpoint>::const_iterator end_point_it;
     const std::vector<edge_endpoint>& u_neighbors =

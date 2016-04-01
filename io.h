@@ -146,12 +146,11 @@ VNRParameters InitializeParametersFromFile(const char* parameter_file) {
     return parameters;
   }
   char buffer[256];
-  const char* prefix[] = {"Goal Utilization", "alpha", "beta", "gamma"};
+  const char* prefix[] = {"Goal Utilization", "alpha", "beta"};
   enum {
     UTIL = 0,
     ALPHA,
-    BETA,
-    GAMMA
+    BETA
   };
 
   while (fgets(buffer, sizeof(buffer), param_file) != NULL) {
@@ -168,9 +167,6 @@ VNRParameters InitializeParametersFromFile(const char* parameter_file) {
             break;
           case BETA:
             sscanf(buffer + strlen(prefix[i]) + 2, "%lf", &parameters.beta);
-            break;
-          case GAMMA:
-            sscanf(buffer + strlen(prefix[i]) + 2, "%lf", &parameters.gamma);
             break;
           default:
             DEBUG("Invalid parameter specified in %s\n", parameter_file);

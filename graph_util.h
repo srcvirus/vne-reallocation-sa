@@ -10,12 +10,8 @@ void UpdateResidualBandwidth(matrix_t<long>& res_bw_matrix, const path_t& path,
   path_t::const_iterator path_it;
   for (path_it = path.begin(); path_it != path.end(); ++path_it) {
     int u = path_it->first, v = path_it->second;
-    // DEBUG("before: res_bw_matrix[%d][%d] = %ld\n", u, v,
-    // res_bw_matrix.matrix[u][v]);
     res_bw_matrix.matrix[u][v] += delta;
     res_bw_matrix.matrix[v][u] += delta;
-    // DEBUG("after: res_bw_matrix[%d][%d] = %ld\n", u, v,
-    // res_bw_matrix.matrix[u][v]);
   }
 }
 
@@ -26,12 +22,8 @@ void UpdateUtilMatrix(const Graph* graph, matrix_t<double>& util_matrix,
     int u = path_it->first, v = path_it->second;
     long b_uv = graph->GetEdgeBandwidth(u, v);
     long res_uv = res_bw_matrix.matrix[u][v];
-    // DEBUG("before: util_matrix[%d][%d] = %lf\n", u, v,
-    // util_matrix.matrix[u][v]);
     util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
         1.0 - static_cast<double>(res_uv) / static_cast<double>(b_uv);
-    // DEBUG("after: util_matrix[%d][%d] = %lf\n", u, v,
-    // util_matrix.matrix[u][v]);
   }
 }
 
@@ -53,12 +45,15 @@ struct dijkstra_node {
   bool operator<(const dijkstra_node& dnode) const { return cost < dnode.cost; }
 };
 
+// Find the least cost path between src and dest having at least bw bandwidth
+// and avoiding edges in to_avoid. Cost of a link is computed as the product of
+// per unit bandwidth cost and the used bandwidth on the link. Hence, the least
+// cost path will contain as less bottleneck links as possible.
 unique_ptr<path_t> ConstrainedVLinkEmbed(const Graph* phys_topology,
                                          const matrix_t<double>& util_matrix,
                                          const matrix_t<long>& res_bw_matrix,
                                          int src, int dest, long bw,
                                          const std::set<edge_t>& to_avoid) {
-
   std::vector<long> d(phys_topology->node_count(), INF);
   std::vector<int> pre(phys_topology->node_count(), NIL);
   std::vector<bool> finished(phys_topology->node_count(), false);
@@ -87,7 +82,6 @@ unique_ptr<path_t> ConstrainedVLinkEmbed(const Graph* phys_topology,
           end_point.cost *
           (bw + (static_cast<long>(util_matrix.matrix[u][v] *
                                    static_cast<double>(end_point.bandwidth))));
-      // long cost = end_point.cost * bw;
       if (d[v] > d[u] + cost) {
         d[v] = d[u] + cost;
         pre[v] = u;

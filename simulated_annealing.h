@@ -11,6 +11,10 @@
 
 #include <math.h>
 
+// Given the pointer a previous solution sa_ptr, the set of virtual links
+// vlinks, their old embedding old_embedded_paths, and their new embeddings
+// new_embedded_paths, return the cost difference between the new solution with
+// the old solution.
 double GetCostDelta(SASolution* sa_sol_ptr,
                     const std::vector<vn_edge_t>& vlinks,
                     const std::vector<path_t>& old_embedded_paths,
@@ -81,6 +85,8 @@ double GetCostDelta(SASolution* sa_sol_ptr,
   return cost_delta;
 }
 
+// Pick a random bottleneck physical link and migrate virtual links until the
+// bottleneck physical link's utilization becomes lower than the threshold.
 bool ReallocateBottleneckPLink(const SASolution* prev_sol,
                                SASolution* new_sol) {
   static boost::random::mt19937 generator;
@@ -218,6 +224,8 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
   return reallocation_possible;
 }
 
+// Randomly migrate a virtual link to a different path to improve link embedding
+// cost.
 bool PerformVLinkMigration(const SASolution* current_solution,
                            SASolution* neighbor_solution) {
   bool reallocation_feasible = false;
@@ -318,6 +326,7 @@ bool PerformVLinkMigration(const SASolution* current_solution,
   return reallocation_feasible;
 }
 
+// Migrate a virtual node and all of its adjacent virtual links.
 bool PerformNodeMigration(const SASolution* current_solution,
                           SASolution* neighbor_solution) {
   bool reallocation_feasible = false;
@@ -453,7 +462,8 @@ bool PerformNodeMigration(const SASolution* current_solution,
   return reallocation_feasible;
 }
 
-unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution, boost::random::mt19937& generator) {
+unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution,
+                                        boost::random::mt19937& generator) {
   unique_ptr<SASolution> neighbor_solution(new SASolution(current_solution));
   enum {
     ALTER_BNECK = 0,
@@ -461,13 +471,11 @@ unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution, boos
     LINK_MIGRATE
   };
   int n_possible_operations = 3;
-  boost::random::uniform_int_distribution<> dist(
-      0, n_possible_operations - 1);
+  boost::random::uniform_int_distribution<> dist(0, n_possible_operations - 1);
   int current_operation = dist(generator);
 
   bool result;
   int total_bottlenecks = 0;
-  // current_operation = ALTER_BNECK;
   switch (current_operation) {
     case ALTER_BNECK:
       total_bottlenecks = neighbor_solution->bottleneck_edges.size();
@@ -487,17 +495,6 @@ unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution, boos
           PerformVLinkMigration(&current_solution, neighbor_solution.get());
       break;
   }
-  /*
-  DEBUG("ALTER_BNECK\n");
-  result = ReallocateBottleneckPLink(
-      &current_solution, neighbor_solution.get());
-  DEBUG("NODE_MIGRATE\n");
-  result = PerformNodeMigration(
-      &current_solution, neighbor_solution.get());
-  DEBUG("LINK_MIGRATE\n");
-  result = PerformVLinkMigration(
-      &current_solution, neighbor_solution.get());
-  */
   return boost::move(neighbor_solution);
 }
 #endif  // _SIMULATED_ANNEALING_H_

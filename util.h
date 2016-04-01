@@ -45,13 +45,6 @@ unique_ptr<ReverseEmbedding> GetInverseEmbedding(
     const Graph* physical_topology, const ptr_vector<VNEmbedding>& embeddings,
     int num_vns);
 
-// Returns the cost of embedding virt_topology on phys_topology.
-long CostFunction(const Graph* phys_topology, int num_vns,
-                  const ptr_vector<Graph>& virt_topologies,
-                  const ptr_vector<VNEmbedding>& embeddings,
-                  const ReverseEmbedding* r_embedding,
-                  const VNRParameters& vnr_params);
-
 // Returns the cost of allocating bandwidth for embedding all the vns in
 // virt_topology on phys_topology.
 unsigned long GetBandwidthCost(
@@ -64,6 +57,7 @@ int GetNumBottleneckLinks(const Graph* phys_topology,
                           const boost::ptr_vector<VNEmbedding>& vn_embeddings,
                           const VNRParameters* vnr_param);
 
+// Returns the maximum physical link utilization.
 double GetMaxPLinkUtilization(
     const Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
     const boost::ptr_vector<VNEmbedding>& vn_embeddings);
@@ -81,6 +75,7 @@ void ComputePhysicalNetworkCapacity(
     Graph* phys_topology, const boost::ptr_vector<Graph>& virt_topologies,
     const boost::ptr_vector<VNEmbedding>& vn_embeddings);
 
+// Write VN embeddings to file.
 void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
                          const std::string& vnr_directory);
 #endif  // UTIL_H_
