@@ -13,11 +13,21 @@
 
 const std::string kUsage =
     "./vne_reallocation "
-    "--case_directory=<case_directory>";
+    "--case_directory=<case_directory>\n"
+    "\t[--max_iterations=<max_iterations>]\n"
+    "\t[--iterations_per_temperature=<iterations_per_temperature>]";
 
+// Maximum number of main simulated annealing iterations to perform. Can
+// also be set by command line option --max_iterations.
 int max_iterations = 300;
+
+// Number of iterations to perform for a fixed temperature. Can also be set by
+// command line option --iterations_per_temperature.
 int iterations_per_temperature = 150;
 
+// Execution thread for simulated annealing search. It takes as parameter a
+// pointer to an initial solution and returns the best solution after the
+// search is complete.
 void* SimulatedAnnealingThread(void* args) {
   SASolution* initial = reinterpret_cast<SASolution*>(args);
   unique_ptr<SASolution> current_solution(new SASolution(*initial));
@@ -121,8 +131,6 @@ int main(int argc, char* argv[]) {
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
     ++num_vns;
   }
-  // ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
-  //                                vn_embeddings);
   physical_topology->Matrixize();
 
   VNRParameters vnr_parameters = InitializeParametersFromFile(

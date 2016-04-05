@@ -133,8 +133,7 @@ unique_ptr<VNEmbedding> InitializeVNEmbeddingFromFile(const char* nmap_file,
     if (u > v) std::swap(u, v);
     if (m > n) std::swap(m, n);
     edge_t plink(u, v), vlink(m, n);
-    if (vn_embedding->edge_map.find(vlink) == 
-        vn_embedding->edge_map.end()) {
+    if (vn_embedding->edge_map.find(vlink) == vn_embedding->edge_map.end()) {
       vn_embedding->edge_map[vlink] = dwdm_path_t();
     }
     vn_embedding->edge_map[vlink].first = ch;

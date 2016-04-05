@@ -23,6 +23,7 @@ using boost::movelib::unique_ptr;
 using boost::ptr_vector;
 using boost::heap::fibonacci_heap;
 
+// Type definition for convenience.
 typedef std::pair<int, int> edge_t;
 typedef std::pair<int, edge_t> dwdm_edge_t;
 typedef std::pair<int, int> vnode_t;
@@ -49,7 +50,7 @@ inline dwdm_edge_t ConstructDWDMEdge(int u, int v, int w) {
 
 template <typename T>
 struct matrix_t {
-  std::vector<std::vector<T > > matrix;
+  std::vector<std::vector<T> > matrix;
   matrix_t() {}
   matrix_t(int rows, int columns, T fill_value = T())
       : matrix(rows, std::vector<T>(columns, fill_value)) {}
@@ -108,6 +109,14 @@ struct edge_endpoint {
   }
 };
 
+// Graph data structure. Represents an undirected graph. Internally, the graph
+// is represented as an adjacency list. As a speed hack, a function
+// Graph::Matrixize() is provided. When invoked, this function converts the
+// internal adjacency list to a adjacency matrix and then can lookup/update
+// link bandwidth in constant time. Be advised to use Graph::Matrixize() only
+// after the structure of the graph is stable, i.e., no link/node
+// addition/deletion
+// is required.
 class Graph {
  public:
   Graph() {
@@ -172,8 +181,7 @@ class Graph {
     adj_list_->at(v).push_back(edge_endpoint(u, channels, delay, cost));
     ++edge_count_;
     node_count_ = adj_list_->size();
-    if (max_channels_ < channels) 
-      max_channels_ = channels;
+    if (max_channels_ < channels) max_channels_ = channels;
   }
 
   int GetEdgeCost(int u, int v) const {
@@ -197,13 +205,13 @@ class Graph {
   }
 
   void SetEdgeNumChannels(int u, int v, long channels) {
-    if (is_matrixized_) adj_matrix_[u][v].channels= channels;
+    if (is_matrixized_) adj_matrix_[u][v].channels = channels;
     std::vector<edge_endpoint>& neighbors = adj_list_->at(u);
     std::vector<edge_endpoint>::iterator end_point_it;
     for (end_point_it = neighbors.begin(); end_point_it != neighbors.end();
          ++end_point_it) {
       if (end_point_it->node_id == v) {
-        end_point_it->channels= channels;
+        end_point_it->channels = channels;
         break;
       }
     }
@@ -258,6 +266,12 @@ struct VNEmbedding {
   virtual ~VNEmbedding() {}
 };
 
+// Contains reverse embedding, i.e., physical --> virtual embedding.
+// rnode_map contains a mapping from a physical node to the set of virtual
+// nodes  mapped on that physical node. redge_map contains mapping from a
+// physical
+// link to the set of virtual links mapped on a path containing that physical
+// link.
 struct ReverseEmbedding {
   std::vector<std::set<vnode_t> > rnode_map;
   reverse_edge_map_t redge_map;
@@ -276,20 +290,51 @@ struct VNRParameters {
 };
 
 struct SASolution {
+  // Immutable pointer to the topology.
   const Graph* physical_topology;
+
+  // Immutable pointer vector the set of virtual topologies.
   const ptr_vector<Graph>& virt_topologies;
+
+  // Immutable pointer vector to the set of location constraints for the virtual
+  // topologies.
   const ptr_vector<std::vector<std::vector<int> > >& location_constraints;
+
+  // Optimization parameters.
   const VNRParameters& vnr_params;
+
+  // Number of VNs.
   int num_vns;
+
+  // Cost of this solution.
   double cost;
+
+  // Embedding of each virtual network from virt_topologies.
   ptr_vector<VNEmbedding> vn_embeddings;
+
+  // Reverse embedding of the virtual networks, i.e., physical --> virtual
+  // mapping.
   unique_ptr<ReverseEmbedding> r_embedding;
+
+  // Physical network utilization matrix.
   matrix_t<double> util_matrix;
+
+  // Physical network residual number of channels matrix.
   matrix_t<std::vector<int> > res_channel_matrix;
-  // matrix_t<long> res_bw_matrix;
+
+  // A heap of bottleneck physical links.
   fibonacci_heap<bneck_edge_element_t> bottleneck_edges;
+
+  // A heap of virtual links sorted by their mapped physical path lengths.
   fibonacci_heap<edge_plength_set_element_t> vlinks_by_plength;
+
+  // A heap of virtual nodes sorted by the cumulative number of channel
+  // consumption
+  // of their incident virtual links.
   fibonacci_heap<node_bw_set_element_t> node_bw_usage;
+
+  // Bookkeeping datastructure to keep track of the heap element from each of
+  // the aforementioned heaps.
   std::map<edge_t, fibonacci_heap<bneck_edge_element_t>::handle_type>
       bneck_heap_handlers;
   std::map<vn_edge_t, fibonacci_heap<edge_plength_set_element_t>::handle_type>
@@ -297,10 +342,10 @@ struct SASolution {
   std::map<vnode_t, fibonacci_heap<node_bw_set_element_t>::handle_type>
       node_bw_heap_handlers;
 
+  // Overloaded assignment opereator.
   SASolution& operator=(const SASolution& sa_sol) {
     util_matrix = sa_sol.util_matrix;
     res_channel_matrix = sa_sol.res_channel_matrix;
-    // res_bw_matrix = sa_sol.res_bw_matrix;
     r_embedding = unique_ptr<ReverseEmbedding>(new ReverseEmbedding(
         sa_sol.r_embedding->rnode_map, sa_sol.r_embedding->redge_map));
     cost = sa_sol.cost;
@@ -339,6 +384,7 @@ struct SASolution {
     return *this;
   }
 
+  // Overloaded copy constructor.
   SASolution(const SASolution& sa_sol)
       : physical_topology(sa_sol.physical_topology),
         virt_topologies(sa_sol.virt_topologies),
@@ -423,12 +469,10 @@ struct SASolution {
         const edge_t& vlink = emap_it->first;
         int ch_id = emap_it->second.first;
         const path_t& plinks = emap_it->second.second;
-
         // Populate the set of vlinks sorted by mapped physical path length.
         vlp_heap_handlers[vn_edge_t(i, vlink)] = vlinks_by_plength.push(
             edge_plength_set_element_t(vn_edge_t(i, vlink), plinks.size()));
-
-        // Populate the list of vnodes sorted according to total channel 
+        // Populate the list of vnodes sorted according to total channel
         // consumption.
         vnode_t nb_key(i, vlink.first);
         if (node_bw_heap_handlers.find(nb_key) == node_bw_heap_handlers.end()) {
@@ -441,9 +485,8 @@ struct SASolution {
             long ch = vend_point_it->channels;
             const dwdm_path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
             path_t::const_iterator path_it;
-            for (path_it = mapped_path.second.begin(); 
-                 path_it != mapped_path.second.end();
-                 ++path_it) {
+            for (path_it = mapped_path.second.begin();
+                 path_it != mapped_path.second.end(); ++path_it) {
               total_cost += ch * physical_topology->GetEdgeCost(
                                      path_it->first, path_it->second);
             }
@@ -451,7 +494,6 @@ struct SASolution {
           node_bw_set_element_t nb_value(nb_key, total_cost);
           node_bw_heap_handlers[nb_key] = node_bw_usage.push(nb_value);
         }
-
         nb_key.second = vlink.second;
         if (node_bw_heap_handlers.find(nb_key) == node_bw_heap_handlers.end()) {
           long total_cost = 0;
@@ -463,7 +505,7 @@ struct SASolution {
             long ch = vend_point_it->channels;
             path_t::const_iterator path_it;
             const dwdm_path_t& mapped_path = vn_embeddings[i].edge_map[vlink];
-            for (path_it = mapped_path.second.begin(); 
+            for (path_it = mapped_path.second.begin();
                  path_it != mapped_path.second.end(); ++path_it) {
               total_cost += ch * physical_topology->GetEdgeCost(
                                      path_it->first, path_it->second);
@@ -472,81 +514,51 @@ struct SASolution {
           node_bw_set_element_t nb_value(nb_key, total_cost);
           node_bw_heap_handlers[nb_key] = node_bw_usage.push(nb_value);
         }
-
         path_t::const_iterator plink_it;
         for (plink_it = plinks.begin(); plink_it != plinks.end(); ++plink_it) {
           int u = plink_it->first, v = plink_it->second;
-          // long ch_mn =
-          //    virt_topologies[i].GetEdgeNumChannels(vlink.first, vlink.second);
-
           // Populate residual channel matrix.
-          std::vector<int>::iterator it = std::find(res_channel_matrix.matrix[u][v].begin(),
-                                                    res_channel_matrix.matrix[u][v].end(),
-                                                    ch_id);
+          std::vector<int>::iterator it =
+              std::find(res_channel_matrix.matrix[u][v].begin(),
+                        res_channel_matrix.matrix[u][v].end(), ch_id);
           if (it == res_channel_matrix.matrix[u][v].end()) {
-            printf("!!!!BANG!!!! Culprit: %d %d %d %d %d %d\n", i, u, v, vlink.first, vlink.second, ch_id);
-          }
-          else res_channel_matrix.matrix[u][v].erase(it);
-          it = std::find(res_channel_matrix.matrix[v][u].begin(), 
-                         res_channel_matrix.matrix[v][u].end(),
-                         ch_id);
-          if (it == res_channel_matrix.matrix[v][u].end()) {
-            // printf("!!!!BANG!!!! Culprit: %d %d %d %d\n", i, v, u, ch_id);
-          }
-          else res_channel_matrix.matrix[v][u].erase(it);
-        }
-      }
-    }
-
-    // Populate utilization matrix.
-    for (int u = 0; u < physical_topology->node_count(); ++u) {
-      std::vector<edge_endpoint>::const_iterator end_point_it;
-      const std::vector<edge_endpoint>& u_neighbors =
-          physical_topology->adj_list()->at(u);
-      for (end_point_it = u_neighbors.begin();
-           end_point_it != u_neighbors.end(); ++end_point_it) {
-        int v = end_point_it->node_id;
-        long res_ch = res_channel_matrix.matrix[u][v].size();
-        long ch_uv = physical_topology->GetEdgeNumChannels(u, v);
-        util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
-            1.0 - static_cast<double>(res_ch) / static_cast<double>(ch_uv);
-        // Populate the set of bottleneck physical links.
-        if (util_matrix.matrix[u][v] > vnr_params.util_threshold) {
-          if (bneck_heap_handlers.find(ConstructEdge(u, v)) ==
-              bneck_heap_handlers.end()) {
-            bneck_heap_handlers[ConstructEdge(u, v)] =
-                bottleneck_edges.push(bneck_edge_element_t(
-                    ConstructEdge(u, v), util_matrix.matrix[u][v]));
+            printf("!!!!BANG!!!! Culprit: %d %d %d %d %d %d\n", i, u, v,
+                   vlink.first, vlink.second, ch_id);
+          } else {
+            res_channel_matrix.matrix[u][v].erase(it);
+            it = std::find(res_channel_matrix.matrix[v][u].begin(),
+                           res_channel_matrix.matrix[v][u].end(), ch_id);
+            if (it != res_channel_matrix.matrix[v][u].end()) {
+              res_channel_matrix.matrix[v][u].erase(it);
+            }
           }
         }
       }
-    }
 
-// For DEBUG only.
-#ifdef DBG
-/*
-    fibonacci_heap<bneck_edge_element_t>::ordered_iterator fit =
-      bottleneck_edges.ordered_begin();
-    for ( ; fit != bottleneck_edges.ordered_end(); ++fit) {
-      printf("Bneck edge: (%d, %d) with util %lf\n",
-          fit->bneck_edge.first, fit->bneck_edge.second, fit->util);
+      // Populate utilization matrix.
+      for (int u = 0; u < physical_topology->node_count(); ++u) {
+        std::vector<edge_endpoint>::const_iterator end_point_it;
+        const std::vector<edge_endpoint>& u_neighbors =
+            physical_topology->adj_list()->at(u);
+        for (end_point_it = u_neighbors.begin();
+             end_point_it != u_neighbors.end(); ++end_point_it) {
+          int v = end_point_it->node_id;
+          long res_ch = res_channel_matrix.matrix[u][v].size();
+          long ch_uv = physical_topology->GetEdgeNumChannels(u, v);
+          util_matrix.matrix[u][v] = util_matrix.matrix[v][u] =
+              1.0 - static_cast<double>(res_ch) / static_cast<double>(ch_uv);
+          // Populate the set of bottleneck physical links.
+          if (util_matrix.matrix[u][v] > vnr_params.util_threshold) {
+            if (bneck_heap_handlers.find(ConstructEdge(u, v)) ==
+                bneck_heap_handlers.end()) {
+              bneck_heap_handlers[ConstructEdge(u, v)] =
+                  bottleneck_edges.push(bneck_edge_element_t(
+                      ConstructEdge(u, v), util_matrix.matrix[u][v]));
+            }
+          }
+        }
+      }
     }
-    fibonacci_heap<node_bw_set_element_t>::ordered_iterator nbit =
-      node_bw_usage.ordered_begin();
-    for (; nbit != node_bw_usage.ordered_end(); ++nbit) {
-      printf("vn = %d, node = %d, bw_cost = %ld\n",
-          nbit->vnode.first, nbit->vnode.second, nbit->bw_usage);
-    }
-    fibonacci_heap<edge_plength_set_element_t>::ordered_iterator it =
-      vlinks_by_plength.ordered_begin();
-    for ( ; it != vlinks_by_plength.ordered_end(); ++it) {
-      printf("vn = %d, vlink = (%d, %d), plen = %d\n",
-          it->vn_edge.first, it->vn_edge.second.first,
-   it->vn_edge.second.second, it->path_len);
-    }
-*/
-#endif
-    // Bad design. need to manually set the cost value.
   }
 };
 

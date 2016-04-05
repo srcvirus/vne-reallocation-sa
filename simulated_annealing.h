@@ -11,6 +11,10 @@
 
 #include <math.h>
 
+// Given the pointer a previous solution sa_ptr, the set of virtual links
+// vlinks, their old embedding old_embedded_paths, and their new embeddings
+// new_embedded_paths, return the cost difference between the new solution
+// with the old solution.
 double GetCostDelta(SASolution* sa_sol_ptr,
                     const std::vector<vn_edge_t>& vlinks,
                     const std::vector<dwdm_path_t>& old_embedded_paths,
@@ -21,15 +25,15 @@ double GetCostDelta(SASolution* sa_sol_ptr,
     const vn_edge_t& vlink = vlinks[vl_index];
     int vn_index = vlink.first;
     int m = vlink.second.first, n = vlink.second.second;
-    long required_channels = 
-      sa_sol_ptr->virt_topologies[vn_index].GetEdgeNumChannels(m, n);
+    long required_channels =
+        sa_sol_ptr->virt_topologies[vn_index].GetEdgeNumChannels(m, n);
     path_t::const_iterator path_it;
     for (path_it = old_embedded_paths[vl_index].second.begin();
          path_it != old_embedded_paths[vl_index].second.end(); ++path_it) {
       int u = path_it->first, v = path_it->second;
       // Subtract the cost of old embedding first.
-      cost_delta -= (required_channels * 
-                      sa_sol_ptr->physical_topology->GetEdgeCost(u, v));
+      cost_delta -= (required_channels *
+                     sa_sol_ptr->physical_topology->GetEdgeCost(u, v));
       if (sa_sol_ptr->bneck_heap_handlers.find(*path_it) !=
           sa_sol_ptr->bneck_heap_handlers.end()) {
         DEBUG("(%d, %d) was a bottleneck\n", u, v);
@@ -55,8 +59,8 @@ double GetCostDelta(SASolution* sa_sol_ptr,
     for (path_it = new_embedded_paths[vl_index].second.begin();
          path_it != new_embedded_paths[vl_index].second.end(); ++path_it) {
       int u = path_it->first, v = path_it->second;
-      cost_delta += required_channels * 
-                      sa_sol_ptr->physical_topology->GetEdgeCost(u, v);
+      cost_delta +=
+          required_channels * sa_sol_ptr->physical_topology->GetEdgeCost(u, v);
       if (sa_sol_ptr->bneck_heap_handlers.find(*path_it) !=
           sa_sol_ptr->bneck_heap_handlers.end()) {
         if (sa_sol_ptr->util_matrix.matrix[u][v] <=
@@ -83,6 +87,8 @@ double GetCostDelta(SASolution* sa_sol_ptr,
   return cost_delta;
 }
 
+// Pick a random bottleneck physical link and migrate virtual links until the
+// bottleneck physical link's utilization becomes lower than the threshold.
 bool ReallocateBottleneckPLink(const SASolution* prev_sol,
                                SASolution* new_sol) {
   int total_bottlenecks = new_sol->bottleneck_edges.size();
@@ -91,8 +97,6 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
   static boost::random::mt19937 generator;
   boost::random::uniform_int_distribution<> dist(0, nTopTenPercent);
   int plink_rank = dist(generator);
-  // DEBUG("Removing %d-th top bottlneck link out of %d\n", plink_rank,
-  //      new_sol->bottleneck_edges.size());
 
   // Get the plink_rank-th most utilized bottleneck link from the PQ.
   fibonacci_heap<bneck_edge_element_t>::ordered_iterator plink_it =
@@ -136,10 +140,11 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
     int max_mapped_path_len = 0;
     if (!selected_vlinks.empty()) {
       std::vector<vn_edge_t>::iterator vlink_it;
-      for (vlink_it = selected_vlinks.begin(); vlink_it != selected_vlinks.end();
-           ++vlink_it) {
-        int mapped_path_len = 
-          new_sol->vn_embeddings[vlink_it->first].edge_map[vlink_it->second].second.size();
+      for (vlink_it = selected_vlinks.begin();
+           vlink_it != selected_vlinks.end(); ++vlink_it) {
+        int mapped_path_len = new_sol->vn_embeddings[vlink_it->first]
+                                  .edge_map[vlink_it->second]
+                                  .second.size();
         if (mapped_path_len > max_mapped_path_len) {
           max_mapped_path_len = mapped_path_len;
           selected_vlink = *vlink_it;
@@ -169,7 +174,7 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
       // Find a new embedding for the vlink.
       unique_ptr<dwdm_path_t> embedded_path(ConstrainedDWDMVLinkEmbed(
           new_sol->physical_topology, new_sol->util_matrix,
-          new_sol->res_channel_matrix, ph_src, ph_dest, required_channels, 
+          new_sol->res_channel_matrix, ph_src, ph_dest, required_channels,
           new_sol->physical_topology->max_channels(), forbidden).release());
       if (embedded_path->second.size() <= 0) {
         DEBUG("Cannot find a path to embed (%d, %d) from vn %d\n", m, n,
@@ -189,8 +194,8 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
 
       // path_t& old_path = embedding.edge_map.find(vlink)->second;
       DEBUG("Old path had length %d\n", old_path.second.size());
-      for (path_t::const_iterator pit = old_path.second.begin(); pit != old_path.second.end();
-           ++pit) {
+      for (path_t::const_iterator pit = old_path.second.begin();
+           pit != old_path.second.end(); ++pit) {
         DEBUG("old_path: (%d %d)\n", pit->first, pit->second);
       }
 
@@ -215,9 +220,11 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
                                  old_path.second, embedded_path->second);
       new_sol->vlinks_by_plength.update(
           new_sol->vlp_heap_handlers[selected_vlink],
-          edge_plength_set_element_t(selected_vlink, embedded_path->second.size()));
+          edge_plength_set_element_t(selected_vlink,
+                                     embedded_path->second.size()));
       old_path.first = embedded_path->first;
-      old_path.second.assign(embedded_path->second.begin(), embedded_path->second.end());
+      old_path.second.assign(embedded_path->second.begin(),
+                             embedded_path->second.end());
       DEBUG("Old cost = %lf, cost_delta = %lf\n", new_sol->cost, cost_delta);
       new_sol->cost += cost_delta;
       reallocation_possible = true;
@@ -241,6 +248,8 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
   return reallocation_possible;
 }
 
+// Randomly migrate a virtual link to a different path to improve link embedding
+// cost.
 bool PerformVLinkMigration(const SASolution* current_solution,
                            SASolution* neighbor_solution) {
   bool reallocation_feasible = false;
@@ -263,20 +272,22 @@ bool PerformVLinkMigration(const SASolution* current_solution,
     int ph_src = neighbor_solution->vn_embeddings[vn_index].node_map[vlink_u];
     int ph_dest = neighbor_solution->vn_embeddings[vn_index].node_map[vlink_v];
     long required_channels = neighbor_solution->virt_topologies[vn_index]
-                  .GetEdgeNumChannels(vlink_u, vlink_v);
+                                 .GetEdgeNumChannels(vlink_u, vlink_v);
     dwdm_path_t& old_path =
         neighbor_solution->vn_embeddings[vn_index].edge_map[vlp.vn_edge.second];
     // Release residual bandwidth on the old embedded path.
     // revisit
-    UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path, false);
+    UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path,
+                          false);
     UpdateUtilMatrix(neighbor_solution->physical_topology,
                      neighbor_solution->util_matrix,
                      neighbor_solution->res_channel_matrix, old_path.second);
     // Try to embed to plink on a new path.
     unique_ptr<dwdm_path_t> embedded_path(ConstrainedDWDMVLinkEmbed(
         neighbor_solution->physical_topology, neighbor_solution->util_matrix,
-        neighbor_solution->res_channel_matrix, ph_src, ph_dest, required_channels,
-        neighbor_solution->physical_topology->max_channels(), std::set<edge_t>()).release());
+        neighbor_solution->res_channel_matrix, ph_src, ph_dest,
+        required_channels, neighbor_solution->physical_topology->max_channels(),
+        std::set<edge_t>()).release());
 
     if (embedded_path->second.size() > 0) {
       // path_t& old_path = neighbor_solution->vn_embeddings[vn_index]
@@ -284,37 +295,40 @@ bool PerformVLinkMigration(const SASolution* current_solution,
       // UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path,
       // bw);
       // UpdateUtilMatrix(neighbor_solution->physical_topology,
-      //    neighbor_solution->util_matrix, neighbor_solution->res_channel_matrix,
+      //    neighbor_solution->util_matrix,
+      // neighbor_solution->res_channel_matrix,
       // old_path);
 
       // Update residual bandwidth and utilization along the newly found path.
       DEBUG("New path of length %d found\n", embedded_path->second.size());
       for (path_t::const_iterator pit = embedded_path->second.begin();
            pit != embedded_path->second.end(); ++pit) {
-        DEBUG("new_path: (%d %d) : %d\n", pit->first, pit->second, 
-            embedded_path->first);
+        DEBUG("new_path: (%d %d) : %d\n", pit->first, pit->second,
+              embedded_path->first);
       }
 
       DEBUG("Old path had length %d\n", old_path.second.size());
-      for (path_t::const_iterator pit = old_path.second.begin(); 
+      for (path_t::const_iterator pit = old_path.second.begin();
            pit != old_path.second.end(); ++pit) {
         DEBUG("old_path: (%d %d) : %d\n", pit->first, pit->second,
-            old_path.first);
+              old_path.first);
       }
       // revisit
-      UpdateResidualChannel(neighbor_solution->res_channel_matrix, *embedded_path, true);
-      UpdateUtilMatrix(neighbor_solution->physical_topology,
-                       neighbor_solution->util_matrix,
-                       neighbor_solution->res_channel_matrix, embedded_path->second);
+      UpdateResidualChannel(neighbor_solution->res_channel_matrix,
+                            *embedded_path, true);
+      UpdateUtilMatrix(
+          neighbor_solution->physical_topology, neighbor_solution->util_matrix,
+          neighbor_solution->res_channel_matrix, embedded_path->second);
       std::vector<vn_edge_t> vlinks_changed(1, vlp.vn_edge);
       std::vector<dwdm_path_t> old_paths(1, old_path);
       std::vector<dwdm_path_t> new_paths(1, *embedded_path);
       double cost_delta =
           GetCostDelta(neighbor_solution, vlinks_changed, old_paths, new_paths);
       UpdateReverseLinkEmbedding(neighbor_solution->r_embedding.get(),
-                                 vlp.vn_edge, old_path.second, embedded_path->second);
+                                 vlp.vn_edge, old_path.second,
+                                 embedded_path->second);
       old_path.first = embedded_path->first;
-      old_path.second.assign(embedded_path->second.begin(), 
+      old_path.second.assign(embedded_path->second.begin(),
                              embedded_path->second.end());
       neighbor_solution->cost += cost_delta;
       reallocation_feasible = true;
@@ -328,7 +342,8 @@ bool PerformVLinkMigration(const SASolution* current_solution,
       // Since no new embedding could be found, restore bandwidth on the old
       // path.
       // revisit
-      UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path, true);
+      UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path,
+                            true);
       UpdateUtilMatrix(neighbor_solution->physical_topology,
                        neighbor_solution->util_matrix,
                        neighbor_solution->res_channel_matrix, old_path.second);
@@ -343,6 +358,7 @@ bool PerformVLinkMigration(const SASolution* current_solution,
   return reallocation_feasible;
 }
 
+// Migrate a virtual node and all of its adjacent virtual links.
 bool PerformNodeMigration(const SASolution* current_solution,
                           SASolution* neighbor_solution) {
   bool reallocation_feasible = false;
@@ -353,7 +369,7 @@ bool PerformNodeMigration(const SASolution* current_solution,
   fibonacci_heap<node_bw_set_element_t>::ordered_iterator nbit =
       neighbor_solution->node_bw_usage.ordered_begin();
   while (--vnode_to_move > 0) ++nbit;
-  if (nbit == neighbor_solution->node_bw_usage.ordered_end()) 
+  if (nbit == neighbor_solution->node_bw_usage.ordered_end())
     return reallocation_feasible;
   node_bw_set_element_t nbw = *nbit;
   neighbor_solution->node_bw_usage.erase(
@@ -389,8 +405,9 @@ bool PerformNodeMigration(const SASolution* current_solution,
           neighbor_solution->vn_embeddings[vn_index].node_map[vnode_v];
       embedded_paths.push_back(ConstrainedDWDMVLinkEmbed(
           neighbor_solution->physical_topology, neighbor_solution->util_matrix,
-          neighbor_solution->res_channel_matrix, temp_u_map, vnode_v_map, 
-          required_channels, neighbor_solution->physical_topology->max_channels(),
+          neighbor_solution->res_channel_matrix, temp_u_map, vnode_v_map,
+          required_channels,
+          neighbor_solution->physical_topology->max_channels(),
           std::set<edge_t>()).release());
       if (embedded_paths.back().second.size() <= 0) {
         embedding_feasible = false;
@@ -398,7 +415,7 @@ bool PerformNodeMigration(const SASolution* current_solution,
       }
       const dwdm_path_t& recent_path = embedded_paths.back();
       total_path_cost += GetEmbeddedPathCost(
-          vn_edge_t(vn_index, ConstructEdge(vnode_u, vnode_v)), 
+          vn_edge_t(vn_index, ConstructEdge(vnode_u, vnode_v)),
           recent_path.second, neighbor_solution);
     }
     if (!embedding_feasible) continue;
@@ -425,21 +442,24 @@ bool PerformNodeMigration(const SASolution* current_solution,
       DEBUG("Finding a path between pnodes %d --> %d\n", best_u_map,
             vnode_v_map);
       dwdm_path_t& old_path = neighbor_solution->vn_embeddings[vn_index]
-                             .edge_map[ConstructEdge(vnode_u, vnode_v)];
+                                  .edge_map[ConstructEdge(vnode_u, vnode_v)];
       // revisit
-      UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path, false);
+      UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path,
+                            false);
       UpdateUtilMatrix(neighbor_solution->physical_topology,
                        neighbor_solution->util_matrix,
                        neighbor_solution->res_channel_matrix, old_path.second);
       unique_ptr<dwdm_path_t> embedded_path(ConstrainedDWDMVLinkEmbed(
           neighbor_solution->physical_topology, neighbor_solution->util_matrix,
           neighbor_solution->res_channel_matrix, best_u_map, vnode_v_map,
-          required_channels, neighbor_solution->physical_topology->max_channels(), 
+          required_channels,
+          neighbor_solution->physical_topology->max_channels(),
           std::set<edge_t>()).release());
       vn_edge_t vl(vn_index, ConstructEdge(vnode_u, vnode_v));
       changed_vlinks.push_back(vl);
       for (int x = 0; x < old_path.second.size(); ++x) {
-        DEBUG("[old_path]: (%d, %d)\n", old_path.second[x].first, old_path.second[x].second);
+        DEBUG("[old_path]: (%d, %d)\n", old_path.second[x].first,
+              old_path.second[x].second);
       }
       for (int x = 0; x < embedded_path->second.size(); ++x) {
         DEBUG("[new_path]: (%d, %d)\n", embedded_path->second[x].first,
@@ -450,17 +470,19 @@ bool PerformNodeMigration(const SASolution* current_solution,
       // UpdateResidualChannel(neighbor_solution->res_channel_matrix, old_path,
       //                        bw);
       // UpdateUtilMatrix(neighbor_solution->physical_topology,
-      //    neighbor_solution->util_matrix, neighbor_solution->res_channel_matrix,
+      //    neighbor_solution->util_matrix,
+      // neighbor_solution->res_channel_matrix,
       // old_path);
       // revisit
-      UpdateResidualChannel(neighbor_solution->res_channel_matrix, *embedded_path, true);
-      UpdateUtilMatrix(neighbor_solution->physical_topology,
-                       neighbor_solution->util_matrix,
-                       neighbor_solution->res_channel_matrix, embedded_path->second);
+      UpdateResidualChannel(neighbor_solution->res_channel_matrix,
+                            *embedded_path, true);
+      UpdateUtilMatrix(
+          neighbor_solution->physical_topology, neighbor_solution->util_matrix,
+          neighbor_solution->res_channel_matrix, embedded_path->second);
       UpdateReverseLinkEmbedding(neighbor_solution->r_embedding.get(), vl,
                                  old_path.second, embedded_path->second);
       old_path.first = embedded_path->first;
-      old_path.second.assign(embedded_path->second.begin(), 
+      old_path.second.assign(embedded_path->second.begin(),
                              embedded_path->second.end());
       neighbor_solution->vlinks_by_plength.update(
           neighbor_solution->vlp_heap_handlers[vl],
@@ -485,9 +507,8 @@ bool PerformNodeMigration(const SASolution* current_solution,
   return reallocation_feasible;
 }
 
-unique_ptr<SASolution> GenerateNeighbor(
-    const SASolution& current_solution, 
-    boost::random::mt19937& generator) {
+unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution,
+                                        boost::random::mt19937& generator) {
   unique_ptr<SASolution> neighbor_solution(new SASolution(current_solution));
   enum {
     ALTER_BNECK = 0,
@@ -495,8 +516,7 @@ unique_ptr<SASolution> GenerateNeighbor(
     LINK_MIGRATE
   };
   int n_possible_operations = 3;
-  boost::random::uniform_int_distribution<> dist(
-      0, n_possible_operations - 1);
+  boost::random::uniform_int_distribution<> dist(0, n_possible_operations - 1);
   int current_operation = dist(generator);
 
   bool result;
