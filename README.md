@@ -58,8 +58,7 @@ Description of these files are as follows:
 A topology file contains the list of edges. Each line contains a description of
 an edge in a comma separated value (CSV) format. Format of a line is as follows:
 ```
-<LinkID>,<SourceNodeId>,<DestinationNodeId>,<PeerID>,<Cost>,<Channels>,<Latency>[<Total
-Channels>]
+<LinkID>,<SourceNodeId>,<DestinationNodeId>,<PeerID>,<Cost>,<Channels>,<Latency>[<Total Channels>]
 ```
 Where,
   * LinkID = Id of a link. Ignored for both physical and virtual topology.
@@ -100,7 +99,7 @@ to that virtual link.
 
 The optimization_para.txt file contains the following lines:
 ```
-Goal Utilizatino = x%
+Goal Utilization = x%
 alpha = <alpha>
 beta = <beta>
 ```
