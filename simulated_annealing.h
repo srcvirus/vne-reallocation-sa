@@ -472,8 +472,8 @@ unique_ptr<SASolution> GenerateNeighbor(const SASolution& current_solution,
   };
   int n_possible_operations = 3;
   boost::random::uniform_int_distribution<> dist(0, n_possible_operations - 1);
-  int current_operation = dist(generator);
-
+  // int current_operation = dist(generator);
+  int current_operation = 1;
   bool result;
   int total_bottlenecks = 0;
   switch (current_operation) {
