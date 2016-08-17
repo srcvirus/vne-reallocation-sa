@@ -241,6 +241,12 @@ int main(int argc, char* argv[]) {
   f = fopen((case_directory + "/vnr/new_max_plink_util").c_str(), "w");
   fprintf(f, "%lf\n", new_max_util);
   fclose(f);
+  f = fopen((case_directory + "/vnr/max_iterations").c_str(), "w");
+  fprintf(f, "%d\n", max_iterations);
+  fclose(f);
+  f = fopen((case_directory + "/vnr/iterations_per_temperature").c_str(), "w");
+  fprintf(f, "%d\n", itertions_per_temperature);
+  fclose(f);
   printf("Initial Solution Cost = %lf\n", initial_solutions[0].cost);
   printf("Best Solution Cost = %lf\n", best_solution->cost);
   WriteSolutionToFile(best_solution->vn_embeddings, case_directory + "/vnr");
