@@ -15,7 +15,8 @@ const std::string kUsage =
     "./vne_reallocation "
     "--case_directory=<case_directory>\n"
     "\t[--max_iterations=<max_iterations>]\n"
-    "\t[--iterations_per_temperature=<iterations_per_temperature>]";
+    "\t[--iterations_per_temperature=<iterations_per_temperature>]\n"
+    "\t[--n_threads=<number of parallel threads>]\n";
 
 // Maximum number of main simulated annealing iterations to perform. Can also be
 // set by command line option --max_iterations
@@ -24,6 +25,9 @@ int max_iterations = 300;
 // Number of iterations to perform for a fixed temperature. Can also be set by
 // command line option --iterations_per_temperature
 int iterations_per_temperature = 150;
+
+// Number of parallel threads to run.
+int n_threads = sysconf(_SC_NPROCESSORS_ONLN);
 
 // Execution thread for simulated annealing search. It takes as parameter a
 // pointer to an initial solution and returns the best solution after the search
@@ -86,7 +90,10 @@ int main(int argc, char* argv[]) {
       max_iterations = atoi(arg_map_it->second.c_str());
     } else if (arg_map_it->first == "--iterations_per_temperature") {
       iterations_per_temperature = atoi(arg_map_it->second.c_str());
-    } else {
+    } else if (arg_map_it->first == "--n_threads") {
+      n_threads = atoi(arg_map_it->second.c_str());
+    }
+    else {
       printf("Invalid command line option: %s\n", arg_map_it->first.c_str());
       printf("Usage: %s\n", kUsage.c_str());
       return 1;
@@ -174,11 +181,10 @@ int main(int argc, char* argv[]) {
       vnr_parameters, vn_embeddings, reverse_embedding.get(), num_vns));
   initial_solutions[0].cost = CostFunction(
       physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
-  const int kNumCores = sysconf(_SC_NPROCESSORS_ONLN);
-  const int kNumThreads = kNumCores;
-  std::vector<pthread_t> threads(kNumThreads);
+  std::vector<pthread_t> threads(n_threads);
   boost::random::mt19937 seed(0x5414ab);
-  for (int i = 0, thread_id = 0, current_core = 0; i < kNumThreads;
+  const int kNumCores = sysconf(_SC_NPROCESSORS_ONLN);
+  for (int i = 0, thread_id = 0, current_core = 0; i < n_threads;
        ++i, ++thread_id, current_core = (current_core + 1) % kNumCores) {
     if (i > 0) {
       initial_solutions.push_back(
@@ -194,7 +200,7 @@ int main(int argc, char* argv[]) {
 
   // Wait for the threads to finish and collect each solution.
   ptr_vector<SASolution> solutions;
-  for (int i = 0; i < kNumThreads; ++i) {
+  for (int i = 0; i < n_threads; ++i) {
     void* ret_value;
     pthread_join(threads[i], &ret_value);
     solutions.push_back(reinterpret_cast<SASolution*>(ret_value));
