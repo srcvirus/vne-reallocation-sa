@@ -175,7 +175,8 @@ int main(int argc, char* argv[]) {
   initial_solutions[0].cost = CostFunction(
       physical_topology.get(), virt_topologies, vn_embeddings, &vnr_parameters);
   const int kNumCores = sysconf(_SC_NPROCESSORS_ONLN);
-  const int kNumThreads = kNumCores;
+  // const int kNumThreads = kNumCores;
+  const int kNumThreads = 1;
   std::vector<pthread_t> threads(kNumThreads);
   boost::random::mt19937 seed(0x5414ab);
   for (int i = 0, thread_id = 0, current_core = 0; i < kNumThreads;
