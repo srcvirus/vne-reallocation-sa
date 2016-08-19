@@ -93,7 +93,8 @@ bool ReallocateBottleneckPLink(const SASolution* prev_sol,
   int total_bottlenecks = new_sol->bottleneck_edges.size();
   int nTopTenPercent = total_bottlenecks;
   // static_cast<int>(ceil(static_cast<double>(total_bottlenecks) / 10.0));
-  boost::random::uniform_int_distribution<> dist(0, nTopTenPercent);
+  // boost::random::uniform_int_distribution<> dist(0, nTopTenPercent);
+  boost::random::uniform_int_distribution<> dist(0, total_bottlenecks);
   int plink_rank = dist(generator);
   // DEBUG("Removing %d-th top bottlneck link out of %d\n", plink_rank,
   //      new_sol->bottleneck_edges.size());
