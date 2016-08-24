@@ -383,10 +383,14 @@ bool PerformNodeMigration(const SASolution* current_solution,
           neighbor_solution);
     }
     if (!embedding_feasible) continue;
-    if (total_path_cost < min_total_path_cost) {
-      min_total_path_cost = total_path_cost;
+    else {
       best_u_map = temp_u_map;
+      break;
     }
+    // if (total_path_cost < min_total_path_cost) {
+    //  min_total_path_cost = total_path_cost;
+    //  best_u_map = temp_u_map;
+    // }
   }
   if (best_u_map != NIL) {
     DEBUG("Reallocating vnode %d of vn %d from pnode %d to pnode %d\n", vnode_u,
