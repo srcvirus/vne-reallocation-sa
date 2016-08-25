@@ -256,14 +256,14 @@ void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
   for (int vn_index = 0; vn_index < vn_embeddings.size(); ++vn_index) {
     std::string emap_file = vnr_directory + "/vn" +
                             boost::lexical_cast<std::string>(vn_index) +
-                            ".edge_remap.txt";
+                            ".txt.semap";
     std::string nmap_file = vnr_directory + "/vn" +
                             boost::lexical_cast<std::string>(vn_index) +
-                            ".node_remap.txt";
+                            ".txt.nmap";
     FILE* nmap_f = fopen(nmap_file.c_str(), "w");
     const VNEmbedding& vne = vn_embeddings[vn_index];
     for (int i = 0; i < vne.node_map.size(); ++i) {
-      fprintf(nmap_f, "VN %d: Virtual node %d --> physical node %d\n", vn_index,
+      fprintf(nmap_f, "Virtual node %d --> physical node %d\n",
               i, vne.node_map[i]);
     }
     fclose(nmap_f);
@@ -277,8 +277,8 @@ void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
       path_t::const_iterator pit;
       for (pit = plinks.begin(); pit != plinks.end(); ++pit) {
         fprintf(emap_f,
-                "VN %d: Virtual edge (%d, %d) --> physical edge (%d, %d)\n",
-                vn_index, vlink.first, vlink.second, pit->first, pit->second);
+                "Virtual edge (%d, %d) --> physical edge (%d, %d)\n",
+                vlink.first, vlink.second, pit->first, pit->second);
       }
     }
     fclose(emap_f);

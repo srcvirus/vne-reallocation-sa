@@ -112,18 +112,27 @@ int main(int argc, char* argv[]) {
   // Read the VNs and their embeddings.
   while (true) {
     const string kVirtTopologyFile = case_directory + "/vnr/vn" +
-                                     boost::lexical_cast<string>(num_vns) +
-                                     ".txt";
+                                     boost::lexical_cast<string>(num_vns);
+                                     // ".txt";
     const string kVNLocationConstraintFile =
-        case_directory + "/vnr/vnloc" + boost::lexical_cast<string>(num_vns) +
-        ".txt";
+        case_directory + "/vnr/vn" + boost::lexical_cast<string>(num_vns) +
+        "loc";
     const string kVLinkEmbeddingFile = kVirtTopologyFile + ".semap";
     const string kVNodeEmbeddingFile = kVirtTopologyFile + ".nmap";
+    const string kVNValidFile = kVirtTopologyFile + ".is_valid";
     unique_ptr<Graph> virt_topology(
         InitializeTopologyFromFile(kVirtTopologyFile.c_str()).release());
     if (virt_topology.get() == NULL) {
       break;
     }
+    FILE* f = fopen(kVNValidFile.c_str(), "r");
+    if (f) {
+      char buf[256];
+      fscanf(f, "%s", buf);
+      if (strcmp(buf, "True")) {
+        continue;
+      }
+    } else continue;
     virt_topologies.push_back(virt_topology.release());
     virt_topologies[num_vns].Matrixize();
     DEBUG(virt_topologies[num_vns].GetDebugString().c_str());
