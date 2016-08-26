@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
         continue;
       }
     } else {
-      ++num_vn;
+      ++num_vns;
       continue;
     }
     virt_topologies.push_back(virt_topology.release());
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
         virt_topologies.back().node_count()).release());
     vn_embeddings.push_back(InitializeVNEmbeddingFromFile(
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
-    ++num_vn;
+    ++num_vns;
   }
 
   // Compute the physical network capacity from the VN embeddings and residual
