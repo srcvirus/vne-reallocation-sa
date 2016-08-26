@@ -120,6 +120,7 @@ int main(int argc, char* argv[]) {
     const string kVLinkEmbeddingFile = kVirtTopologyFile + ".semap";
     const string kVNodeEmbeddingFile = kVirtTopologyFile + ".nmap";
     const string kVNValidFile = kVirtTopologyFile + ".is_valid";
+    printf("Reading file: %s\n", kVirtTopologyFile.c_str());
     unique_ptr<Graph> virt_topology(
         InitializeTopologyFromFile(kVirtTopologyFile.c_str()).release());
     if (virt_topology.get() == NULL) {
