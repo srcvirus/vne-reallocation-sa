@@ -131,18 +131,22 @@ int main(int argc, char* argv[]) {
       char buf[256];
       fscanf(f, "%s", buf);
       if (strcmp(buf, "True")) {
+        ++num_vns;
         continue;
       }
-    } else continue;
+    } else {
+      ++num_vn;
+      continue;
+    }
     virt_topologies.push_back(virt_topology.release());
-    virt_topologies[num_vns].Matrixize();
-    DEBUG(virt_topologies[num_vns].GetDebugString().c_str());
+    virt_topologies.back().Matrixize();
+    DEBUG(virt_topologies.back().GetDebugString().c_str());
     location_constraints.push_back(InitializeVNLocationsFromFile(
         kVNLocationConstraintFile.c_str(),
-        virt_topologies[num_vns].node_count()).release());
+        virt_topologies.back().node_count()).release());
     vn_embeddings.push_back(InitializeVNEmbeddingFromFile(
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
-    ++num_vns;
+    ++num_vn;
   }
 
   // Compute the physical network capacity from the VN embeddings and residual
