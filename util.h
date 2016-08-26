@@ -77,5 +77,6 @@ void ComputePhysicalNetworkCapacity(
 
 // Write VN embeddings to file.
 void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
-                         const std::string& vnr_directory);
+                         const std::string& vnr_directory,
+                         const std::vector<int>& valid_indices);
 #endif  // UTIL_H_

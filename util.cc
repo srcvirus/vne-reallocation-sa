@@ -252,16 +252,18 @@ void ComputePhysicalNetworkCapacity(
 }
 
 void WriteSolutionToFile(const boost::ptr_vector<VNEmbedding>& vn_embeddings,
-                         const std::string& vnr_directory) {
-  for (int vn_index = 0; vn_index < vn_embeddings.size(); ++vn_index) {
+                         const std::string& vnr_directory,
+                         const std::vector<int>& valid_indices) {
+  for (int a = 0; a < vn_embeddings.size(); ++a) {
+    int vn_index = valid_indices[a];
     std::string emap_file = vnr_directory + "/vn" +
                             boost::lexical_cast<std::string>(vn_index) +
-                            ".txt.semap";
+                            ".semap";
     std::string nmap_file = vnr_directory + "/vn" +
                             boost::lexical_cast<std::string>(vn_index) +
-                            ".txt.nmap";
+                            ".nmap";
     FILE* nmap_f = fopen(nmap_file.c_str(), "w");
-    const VNEmbedding& vne = vn_embeddings[vn_index];
+    const VNEmbedding& vne = vn_embeddings[a];
     for (int i = 0; i < vne.node_map.size(); ++i) {
       fprintf(nmap_f, "Virtual node %d --> physical node %d\n",
               i, vne.node_map[i]);

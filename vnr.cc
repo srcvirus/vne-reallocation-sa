@@ -105,6 +105,7 @@ int main(int argc, char* argv[]) {
   unique_ptr<Graph> physical_topology(
       InitializeTopologyFromFile(kPhysicalTopologyFile.c_str()).release());
   int num_vns = 0;
+  std::vector<int> valid_indices;
   boost::ptr_vector<Graph> virt_topologies;
   boost::ptr_vector<std::vector<std::vector<int> > > location_constraints;
   boost::ptr_vector<VNEmbedding> vn_embeddings;
@@ -138,6 +139,7 @@ int main(int argc, char* argv[]) {
       ++num_vns;
       continue;
     }
+    valid_indices.push_back(num_vns);
     virt_topologies.push_back(virt_topology.release());
     virt_topologies.back().Matrixize();
     DEBUG(virt_topologies.back().GetDebugString().c_str());
@@ -148,7 +150,7 @@ int main(int argc, char* argv[]) {
         kVNodeEmbeddingFile.c_str(), kVLinkEmbeddingFile.c_str()).release());
     ++num_vns;
   }
-
+  num_vns = virt_topologies.size();
   // Compute the physical network capacity from the VN embeddings and residual
   // capacity.
   ComputePhysicalNetworkCapacity(physical_topology.get(), virt_topologies,
@@ -269,6 +271,6 @@ int main(int argc, char* argv[]) {
   fclose(f);
   printf("Initial Solution Cost = %lf\n", initial_solutions[0].cost);
   printf("Best Solution Cost = %lf\n", best_solution->cost);
-  WriteSolutionToFile(best_solution->vn_embeddings, case_directory + "/vnr");
+  WriteSolutionToFile(best_solution->vn_embeddings, case_directory + "/vnr", valid_indices);
   return 0;
 }
